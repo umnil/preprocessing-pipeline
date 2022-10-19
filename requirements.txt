@@ -1,0 +1,8 @@
+flake8
+black
+mypy
+numpy
+pandas
+pytest
+scikit-learn
+mne
