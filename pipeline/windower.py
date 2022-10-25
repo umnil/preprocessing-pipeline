@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 
-from typing import List, Any
+from typing import List
 from collections import Counter
 from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
 
