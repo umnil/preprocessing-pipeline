@@ -13,18 +13,21 @@ class Windower(TransformerMixin, BaseEstimator):
     data
     """
 
-    def __init__(self,
-                 window_size: int = 8,
-                 label_scheme: int = 0,
-                 window_step: int = 1,
-                 trial_size: int = 750,
-                 packet_channel_sizes: List[int] = [80, 2, 80, 2]):
+    def __init__(
+        self,
+        window_size: int = 8,
+        label_scheme: int = 0,
+        window_step: int = 1,
+        trial_size: int = 750,
+        packet_channel_sizes: List[int] = [80, 2, 80, 2],
+    ):
         """
 
         Parameters
         ----------
         window_size : int
             The number of packets to group into a window of data.
+            Ignored if `label_scheme == 4`
         label_scheme : int
             Indicates how the window should be labeled. Labeling schemes are as
             follows
@@ -35,15 +38,18 @@ class Windower(TransformerMixin, BaseEstimator):
                     the window
             3 - Non ambiguous lableling, this is the same as 0 except if a
                     window ever has a mix of packets, then it is labeled with NaN
+            4 - Windows are made by associated lables (and are not assumed fixed)
         window_step : int
             The number of windows to move forward each step. If
             `window_step == window_size`, then there is no overlapping data in
             each window
+            Ignored if `label_scheme == 4`
         trial_size : int
             In case multiple trials were processed prior to receiving the
             input, this trial size value ensures that the data is appropriately
             divided prior to windowing. This is the number of packets expected
             per trial
+            Ignored if `label_scheme == 4`
         packet_channel_sizes : List[int]
             This lise has a value for every channel with data in each packet.
             Each element of this list specifies that amount of data each
@@ -57,8 +63,7 @@ class Windower(TransformerMixin, BaseEstimator):
         self.label_scheme: int = label_scheme
         self._window_packet_size: int = self.window_size * self.packet_size
         self._window_channel_size: List[int] = [
-            self.window_size * x
-            for x in self.packet_channel_sizes
+            self.window_size * x for x in self.packet_channel_sizes
         ]
         self._window_packets: np.ndarray = np.array([])
         self._n_packets: int = 0
@@ -110,12 +115,11 @@ class Windower(TransformerMixin, BaseEstimator):
         n_channels: int = len(self.packet_channel_sizes)
         for channel_idx in range(n_channels):
             channel_data: np.ndarray = self._get_channel_packets(X, channel_idx)
-            windowed_channel_data: np.ndarray = self._transform_channel(
-                channel_data
-            )
+            windowed_channel_data: np.ndarray = self._transform_channel(channel_data)
             result = (
                 np.c_[result, windowed_channel_data]
-                if result.shape[0] != 0 else windowed_channel_data
+                if result.shape[0] != 0
+                else windowed_channel_data
             )
         self._X = result
 
@@ -135,10 +139,16 @@ class Windower(TransformerMixin, BaseEstimator):
             an Wx1 input array were W is the number of windows
         """
         self._y = y
-        y_transformed: np.ndarray = np.array([
-            [y[packet_idx] for packet_idx in window]
-            for window in self.window_packets
-        ])
+        y_transformed: np.ndarray = np.array(
+            [
+                [
+                    y[int(packet_idx)] if not np.isnan(packet_idx) else np.nan
+                    for packet_idx in window
+                ]
+                for window in self.window_packets
+            ],
+            dtype=object if self.label_scheme == 4 else np.int64,
+        )
 
         if self.label_scheme == 0:
             # Only use the first packet label
@@ -156,6 +166,9 @@ class Windower(TransformerMixin, BaseEstimator):
             y_transformed = np.array(
                 [np.nan if len(set(x)) > 1 else x[0] for x in y_transformed]
             )
+        elif self.label_scheme == 4:
+            n_packets: int = y_transformed.shape[1]
+            self._window_channel_size = (np.array(self.packet_channel_sizes) * n_packets).tolist()
         self._n_windows = y_transformed.shape[0]
         return y_transformed
 
@@ -176,7 +189,7 @@ class Windower(TransformerMixin, BaseEstimator):
             of data points per packet for the specified channel
         """
         pre_channels: List[int] = self.packet_channel_sizes[:channel]
-        inc_channels: List[int] = self.packet_channel_sizes[:channel+1]
+        inc_channels: List[int] = self.packet_channel_sizes[: channel + 1]
         pre_n_points: int = sum(pre_channels)
         inc_n_points: int = sum(inc_channels)
         channel_data: np.ndarray = X[:, pre_n_points:inc_n_points]
@@ -196,50 +209,121 @@ class Windower(TransformerMixin, BaseEstimator):
         np.ndarray
             An NxM array with N windows and M data points per window
         """
-        return np.array([
-            np.hstack(ch[packet_idxs])
-            for packet_idxs in self.window_packets
-        ])
+        result: np.ndarray = np.array([[]])
+        packet_channel_size: int = ch.shape[1]
+        for window_packet_idxs in self.window_packets:
+            selected_packet_idxs: List[int] = [
+                int(i) for i in window_packet_idxs if not np.isnan(i)
+            ]
+            n_selected_packets: int = len(selected_packet_idxs)
+            n_nan_packets: int = len([i for i in window_packet_idxs if np.isnan(i)])
+
+            window_packets: np.ndarray = ch[selected_packet_idxs]
+            if self.label_scheme == 4:
+                nan_data: np.ndarray = np.ones([n_nan_packets, packet_channel_size]) * np.nan
+                window_packets = np.r_[window_packets, nan_data]
+            assert window_packets.shape == (len(window_packet_idxs), packet_channel_size)
+            window_data: np.array = np.hstack(window_packets)
+            result = (
+                np.append(result, [window_data], axis=0)
+                if result.shape[1] > 0
+                else np.array([window_data])
+            )
+        return result
+
+    def get_trial_window_packets(self, trial_idx: int) -> np.ndarray:
+        """
+        Given a trial index, return a MxN matrix where M is the number of
+        windows and N is the number of packets in each window. The values in
+        the matrix are essentially an index pointer to `x` pointing to the
+        packet belongs to the window
+
+        Parameters
+        ----------
+        trial_idx : int
+            The index of the trial to develop a window packet matrix
+
+        Returns
+        -------
+        np.ndarray
+            The window packet matrix for the given trial index
+        """
+        packet_idx_limits: np.ndarray = (
+            np.array([trial_idx, trial_idx + 1]) * self.trial_size
+        )
+        base_idx: np.ndarray = np.arange(0, self.trial_size)
+        packet_idxs: np.ndarray = np.arange(*packet_idx_limits)
+
+        s: int = 0
+        e: int = -(self.window_size - 1)
+        window_packets: np.ndarray = np.array(
+            [
+                packet_idxs[x : x + self.window_size]
+                for x in base_idx[s : e : self.window_step]
+            ]
+        )
+        return window_packets
+
+    def get_label_packets(self) -> np.array:
+        """
+        Returns
+        -------
+        List
+            MxN array where M is the number of windows and N is the number of
+            packets in each window, NOTE that this is a ragid matrix. N may be
+            different for each M.
+        """
+        y_diff: np.ndarray = self._y[1:] - self._y[:-1]
+        y_change_idxs: np.ndarray = np.where(y_diff != 0)[0] + 1
+        y_start_idxs: np.ndarray = np.insert(y_change_idxs, 0, 0)
+        y_end_idxs: np.ndarray = np.append(y_change_idxs, len(self._y))
+        base_idx: List = list(range(0, self._y.size))
+        ragid_matrix: List = [base_idx[s:e] for s, e in zip(y_start_idxs, y_end_idxs)]
+        row_max_size: int = max([len(i) for i in ragid_matrix])
+        for i, row in enumerate(ragid_matrix):
+            diff: int = row_max_size - len(row)
+            ragid_matrix[i] = row + [np.nan] * diff
+
+        return np.array(ragid_matrix)
 
     @property
     def window_packets(self) -> np.ndarray:
-        """A list of packet indicies for each window. This is actually were the
-        bulk of the logic for windowing is performed. All the other matrices
-        are fit to this window packet formation.
+        """A list of packet indicies for each window. This is actually where
+        the bulk of the logic for windowing is performed. All the other
+        matrices are fit to this window packet formation.
         """
         # use cached value if
         if (
-                # there is a value that's been cached
-                (self._window_packets.size > 0)
-                # and the windowing parameters haven't been changed
-                and (self._window_packet_size == self.window_size * self.packet_size)
-                # and the number of packets to transform hasn't changed
-                and (self._n_packets == self._y.shape[0])
-                ):
+            # there is a value that's been cached
+            (self._window_packets.size > 0)
+            # and the windowing parameters haven't been changed
+            and (self._window_packet_size == self.window_size * self.packet_size)
+            # and the number of packets to transform hasn't changed
+            and (self._n_packets == self._y.shape[0])
+        ):
             return self._window_packets
 
         self._n_packets = self._y.shape[0]
         self.packet_size = sum(self.packet_channel_sizes)
         self._window_packet_size = self.window_size * self.packet_size
-        n_trials: int = self._n_packets // self.trial_size
-        if n_trials == 0:
-            LOGGER.warn("No trials, reshifiting")
-            self.trial_size = self._y.shape[0]
-            n_trials = 1
+
         trial_window_packets: List = []
         trial_window_lengths: List = []
-        for trial_idx in range(n_trials):
-            packet_idx_limits: np.ndarray = (
-                np.array([trial_idx, trial_idx + 1]) * self.trial_size
-            )
-            base_idx: np.ndarray = np.arange(0, self.trial_size)
-            packet_idxs: np.ndarray = np.arange(*packet_idx_limits)
-            window_packets = np.array([
-                packet_idxs[x : x + self.window_size]
-                for x in base_idx[:-(self.window_size - 1):self.window_step]
-            ])
-            trial_window_lengths.append(window_packets.shape[0])
-            trial_window_packets.append(window_packets)
+        if self.label_scheme < 4:
+            n_trials: int = self._n_packets // self.trial_size
+            if n_trials == 0:
+                LOGGER.warn(
+                    f"No trials found, reshifiting trial size to {self._y.shape[0]}"
+                )
+                self.trial_size = self._y.shape[0]
+                n_trials = 1
+            for trial_idx in range(n_trials):
+                window_packets: np.ndarray = self.get_trial_window_packets(trial_idx)
+                trial_window_lengths.append(window_packets.shape[0])
+                trial_window_packets.append(window_packets)
+        else:
+            trial_window_packets = self.get_label_packets()
+            trial_window_lengths = len(trial_window_packets)
 
         self._trial_window_lengths = trial_window_lengths
         self._window_packets = np.vstack(trial_window_packets)
