@@ -3,7 +3,7 @@ import pickle
 import numpy as np
 import pandas as pd  # type: ignore
 
-from typing import List, Dict, Tuple, Callable
+from typing import List, Dict, Tuple
 from pipeline.extractor import Extractor
 from pipeline.windower import Windower
 
@@ -21,7 +21,7 @@ class TestWindower:
         data_dir, example_data_202201_filename
     )
 
-    def make_packet(self, ch1_n: int = 10, ch2_n = 4):
+    def make_packet(self, ch1_n=10, ch2_n=4):
         """For dummy testing"""
         return [
             (128 * np.random.rand(ch1_n))
@@ -174,9 +174,6 @@ class TestWindower:
         assert window_packet_idxs.shape == (2, 5)
 
     def test_get_label_packets(self):
-        X: np.ndarray = np.array(
-            [np.hstack(self.make_packet()) for i in range(20)]
-        )  # trial is 10 packets
         y: np.ndarray = np.hstack([[0]*5, [1]*5]*2)
         w: Windower = Windower(
             window_size=5, window_step=5, trial_size=10, packet_channel_sizes=[10, 4]

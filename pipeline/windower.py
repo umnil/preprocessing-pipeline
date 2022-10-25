@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 
-from typing import List
+from typing import List, Any
 from collections import Counter
 from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
 
@@ -168,7 +168,9 @@ class Windower(TransformerMixin, BaseEstimator):
             )
         elif self.label_scheme == 4:
             n_packets: int = y_transformed.shape[1]
-            self._window_channel_size = (np.array(self.packet_channel_sizes) * n_packets).tolist()
+            self._window_channel_size = (
+                np.array(self.packet_channel_sizes) * n_packets
+            ).tolist()
         self._n_windows = y_transformed.shape[0]
         return y_transformed
 
@@ -215,15 +217,18 @@ class Windower(TransformerMixin, BaseEstimator):
             selected_packet_idxs: List[int] = [
                 int(i) for i in window_packet_idxs if not np.isnan(i)
             ]
-            n_selected_packets: int = len(selected_packet_idxs)
             n_nan_packets: int = len([i for i in window_packet_idxs if np.isnan(i)])
-
             window_packets: np.ndarray = ch[selected_packet_idxs]
             if self.label_scheme == 4:
-                nan_data: np.ndarray = np.ones([n_nan_packets, packet_channel_size]) * np.nan
+                nan_data: np.ndarray = (
+                    np.ones([n_nan_packets, packet_channel_size]) * np.nan
+                )
                 window_packets = np.r_[window_packets, nan_data]
-            assert window_packets.shape == (len(window_packet_idxs), packet_channel_size)
-            window_data: np.array = np.hstack(window_packets)
+            assert window_packets.shape == (
+                len(window_packet_idxs),
+                packet_channel_size,
+            )
+            window_data: np.ndarray = np.hstack(window_packets)  # type: ignore
             result = (
                 np.append(result, [window_data], axis=0)
                 if result.shape[1] > 0
@@ -264,7 +269,7 @@ class Windower(TransformerMixin, BaseEstimator):
         )
         return window_packets
 
-    def get_label_packets(self) -> np.array:
+    def get_label_packets(self) -> np.ndarray:
         """
         Returns
         -------
@@ -322,8 +327,8 @@ class Windower(TransformerMixin, BaseEstimator):
                 trial_window_lengths.append(window_packets.shape[0])
                 trial_window_packets.append(window_packets)
         else:
-            trial_window_packets = self.get_label_packets()
-            trial_window_lengths = len(trial_window_packets)
+            trial_window_packets = self.get_label_packets().tolist()
+            trial_window_lengths = [len(trial_window_packets)]
 
         self._trial_window_lengths = trial_window_lengths
         self._window_packets = np.vstack(trial_window_packets)
