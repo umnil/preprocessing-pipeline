@@ -1,8 +1,11 @@
+import logging
 import numpy as np
 
 from typing import List, Dict, Optional, cast
 from mne.filter import filter_data  # type: ignore
 from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
+
+LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 class Filterer(TransformerMixin, BaseEstimator):
@@ -133,6 +136,9 @@ class Filterer(TransformerMixin, BaseEstimator):
         self._artifacts = X[window_artifact_mask, :]
         self._y = y[~window_artifact_mask]
         self._y_hat = self._y
+        result: np.ndarray = X[~window_artifact_mask, :]
+        if result.shape[0] == 0:
+            LOGGER.warn("All observations been removed from artifact filtering!")
         return X[~window_artifact_mask, :]
 
     def fit(self, X: np.ndarray, y: np.ndarray, *args, **kwargs) -> "Filterer":
