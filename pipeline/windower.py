@@ -321,12 +321,18 @@ class Windower(TransformerMixin, BaseEstimator):
                 LOGGER.warn(
                     f"No trials found, reshifiting trial size to {self._y.shape[0]}"
                 )
+                self._trial_size_original = self.trial_size
                 self.trial_size = self._y.shape[0]
                 n_trials = 1
             for trial_idx in range(n_trials):
                 window_packets: np.ndarray = self.get_trial_window_packets(trial_idx)
                 trial_window_lengths.append(window_packets.shape[0])
                 trial_window_packets.append(window_packets)
+            self.trial_size = (
+                self.trial_size
+                if not hasattr(self, "_trail_size_original")
+                else self._trial_size_original
+            )
         else:
             trial_window_packets = self.get_label_packets().tolist()
             trial_window_lengths = [len(trial_window_packets)]
