@@ -8,12 +8,9 @@ from sklearn.pipeline import Pipeline  # type: ignore
 
 
 class TransformPipeline(Pipeline):
-
     def transform(
-            self,
-            X: np.ndarray,
-            y: np.ndarray,
-            debug: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+        self, X: np.ndarray, y: np.ndarray, debug: bool = False
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         preform a transformation on both the data and the labels. Useful for
         when labels need to be removed with data or when data is split up and
@@ -60,43 +57,36 @@ class TransformPipeline(Pipeline):
             )
             dims: List = list(X_hat.shape)
             for i, dim in enumerate(dims):
-                assert dim > 0, f"Dimension {i} doesn't work"
+                assert (
+                    dim > 0
+                ), (
+                        f"The {name} step (step #{step}) of the pipeline " +
+                        f"depleted the values in dimension {i} of the data " +
+                        "matrix"
+                    )
 
             X, y = X_hat, y_hat
 
         return (X_hat, y_hat)
 
     def _step_transform(
-            self,
-            step: Any,
-            X: np.ndarray,
-            y: np.ndarray,
-            debug: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+        self, step: Any, X: np.ndarray, y: np.ndarray, debug: bool = False
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Preform the actual data transformation at the given step"""
         X_hat: np.ndarray
         y_hat: np.ndarray
         try:
             X_hat = step.fit_transform(X, y)
-            y_hat = (
-                y
-                if not hasattr(step, "_y_hat")
-                else getattr(step, "_y_hat")
-            )
+            y_hat = y if not hasattr(step, "_y_hat") else getattr(step, "_y_hat")
 
             return (X_hat, y_hat)
         except Exception as e:
             if debug:
                 data_artifact: Dict = {
-                    "initial_data": {
-                        "X": self.X_original,
-                        "y": self.y_original
-                    },
-                    "input_data": {
-                        "X": X,
-                        "y": y
-                    },
+                    "initial_data": {"X": self.X_original, "y": self.y_original},
+                    "input_data": {"X": X, "y": y},
                     "pipeline": self,
-                    "step": step
+                    "step": step,
                 }
                 cur_time: datetime = datetime.now()
                 cur_time_str: str = cur_time.strftime("%Y%m%d%H%M%S")
