@@ -171,7 +171,7 @@ class Windower(TransformerMixin, BaseEstimator):
             self._window_channel_size = (
                 np.array(self.packet_channel_sizes) * n_packets
             ).tolist()
-            y_transformed = y_transformed[:, 0].flatten()
+            y_transformed = y_transformed[:, 0].flatten().astype(np.float64)
         self._n_windows = y_transformed.shape[0]
         return y_transformed
 
