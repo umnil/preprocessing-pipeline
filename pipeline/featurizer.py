@@ -66,6 +66,7 @@ class Featurizer(TransformerMixin, BaseEstimator):
         # Uninitialized variables set elsewhere
         self._freqs: np.ndarray
         self._feature_name_list: List = [0] * len(self.window_channel_sizes)
+        self._window_channel_sizes: List = [None] * len(self.window_channel_sizes)
         self._X: np.ndarray
 
     @property
@@ -163,6 +164,7 @@ class Featurizer(TransformerMixin, BaseEstimator):
             feature_names = [f"ch{channel_idx+1}_static"]
 
         self._feature_name_list[channel_idx] = feature_names
+        self._window_channel_sizes[channel_idx] = len(feature_names)
         return result
 
     def to_long(self, y: np.ndarray) -> pd.DataFrame:
