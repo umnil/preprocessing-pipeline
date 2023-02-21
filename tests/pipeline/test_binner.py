@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import pandas as pd  # type: ignore
 
 from pipeline.extractor import Extractor
@@ -6,6 +7,7 @@ from pipeline.featurizer import Featurizer
 from pipeline.filter import Filterer
 from pipeline.psdbinner import PSDBinner
 from pipeline.windower import Windower
+from typing import List
 
 
 class TestBinner:

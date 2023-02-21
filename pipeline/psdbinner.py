@@ -78,7 +78,6 @@ class PSDBinner(TransformerMixin):
             self.n_channels = len(self.window_channel_sizes)
 
         self.freqs = cast(np.ndarray, freqs)
-        freq_idx: np.ndarray = np.arange(len(self.freqs))
 
         self._bin_freq_idxs: List = []
         self._freq_idx: np.ndarray = np.array([])
