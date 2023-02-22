@@ -1,10 +1,10 @@
 import mne  # type: ignore
 import numpy as np
-from sklearn.base import TransformerMixin  # type: ignore
+from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
 from typing import List, Optional, cast
 
 
-class PSDBinner(TransformerMixin):
+class PSDBinner(TransformerMixin, BaseEstimator):
     """
     This class takes results from a power spectral density and formats them
     into bins
@@ -53,18 +53,20 @@ class PSDBinner(TransformerMixin):
             fmin, sfreq)
         """
         self.bins: List[List] = bins
-        self.method: str = method
+        self._raw: Optional[mne.Epochs] = raw
+        self.sfreq: Optional[int] = sfreq
+        self._slen: Optional[int] = slen
         self.freqs: np.ndarray
-        self.window_channel_sizes: List = []
-        self.n_channels: int = 1
+        self.window_channel_sizes: List = window_channel_sizes
+        self.psd_channels: List[int] = psd_channels
+        self.method: str = method
         self.psd_channels: List = psd_channels
 
         psds: np.ndarray
         if raw is not None:
-            psds, freqs = mne.time_frequency.psd_multitaper(raw.copy(), **kwargs)
+            self.raw = raw
         elif (sfreq is not None) and (slen is not None):
-            x: np.ndarray = np.ones((1, slen))
-            psds, freqs = mne.time_frequency.psd_array_multitaper(x, sfreq=sfreq)
+            self.slen = slen
         elif freqs is not None:
             freqs = freqs
         else:
@@ -75,9 +77,6 @@ class PSDBinner(TransformerMixin):
 
         if window_channel_sizes is not None:
             self.window_channel_sizes = window_channel_sizes
-            self.n_channels = len(self.window_channel_sizes)
-
-        self.freqs = cast(np.ndarray, freqs)
 
         self._bin_freq_idxs: List = []
         self._freq_idx: np.ndarray = np.array([])
@@ -203,9 +202,6 @@ class PSDBinner(TransformerMixin):
     def bin_freq_idxs(self) -> List:
         """Return a list of indicies that point to the frequency indicies
         associated with each bin"""
-        if len(self._bin_freq_idxs) > 0:
-            return self._bin_freq_idxs
-
         self._bin_freq_idxs = [
             self.freq_idx[(self.freqs >= binl) & (self.freqs < binh)]
             for binl, binh in self.bins
@@ -214,8 +210,32 @@ class PSDBinner(TransformerMixin):
 
     @property
     def freq_idx(self) -> np.ndarray:
-        if self._freq_idx.size > 0:
-            return self._freq_idx
-
         self._freq_idx = np.arange(len(self.freqs))
         return self._freq_idx
+
+    @property
+    def n_channels(self) -> int:
+        return (
+            1 if self.window_channel_sizes is None else len(self.window_channel_sizes)
+        )
+
+    @property
+    def raw(self) -> Optional[mne.Epochs]:
+        return self._raw
+
+    @raw.setter
+    def raw(self, r: mne.Epochs):
+        self._raw = r
+        psds, freqs = mne.time_frequency.psd_multitaper(self._raw.copy(), **kwargs)
+        self.freqs = fres
+
+    @property
+    def slen(self) -> Optional[int]:
+        return self._slen
+
+    @slen.setter
+    def slen(self, slen: Optional[int]):
+        self._slen = slen
+        x: np.ndarray = np.ones((1, slen))
+        psds, freqs = mne.time_frequency.psd_array_multitaper(x, sfreq=self.sfreq)
+        self.freqs = freqs
