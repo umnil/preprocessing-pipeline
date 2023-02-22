@@ -61,7 +61,6 @@ class PSDBinner(TransformerMixin, BaseEstimator):
         self.psd_channels: List[int] = psd_channels
         self.method: str = method
 
-        psds: np.ndarray
         if raw is not None:
             self.raw = raw
         elif (sfreq is not None) and (slen is not None):
