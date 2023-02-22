@@ -1,6 +1,6 @@
 import mne  # type: ignore
 import numpy as np
-from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
+from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
 from typing import List, Optional, cast
 
 
@@ -57,10 +57,9 @@ class PSDBinner(TransformerMixin, BaseEstimator):
         self.sfreq: Optional[int] = sfreq
         self._slen: Optional[int] = slen
         self.freqs: np.ndarray
-        self.window_channel_sizes: List = window_channel_sizes
+        self.window_channel_sizes: Optional[List] = window_channel_sizes
         self.psd_channels: List[int] = psd_channels
         self.method: str = method
-        self.psd_channels: List = psd_channels
 
         psds: np.ndarray
         if raw is not None:
@@ -68,7 +67,7 @@ class PSDBinner(TransformerMixin, BaseEstimator):
         elif (sfreq is not None) and (slen is not None):
             self.slen = slen
         elif freqs is not None:
-            freqs = freqs
+            self.freqs = freqs
         else:
             raise Exception(
                 "Either the raw parameter musted be supplied or the sfreq, slen "
@@ -194,7 +193,10 @@ class PSDBinner(TransformerMixin, BaseEstimator):
         List
             A list of psd data per channel
         """
-        wcs: np.ndarray = np.cumsum([0] + self.window_channel_sizes)
+        if self.window_channel_sizes is None:
+            return [x]
+        _wcs: List = cast(List, self.window_channel_sizes)
+        wcs: np.ndarray = np.cumsum([0] + _wcs)
         channel_bounds: List = [(i, f) for i, f in zip(wcs[:-1], wcs[1:])]
         return [x[..., i:f] for i, f in channel_bounds]
 
@@ -226,8 +228,8 @@ class PSDBinner(TransformerMixin, BaseEstimator):
     @raw.setter
     def raw(self, r: mne.Epochs):
         self._raw = r
-        psds, freqs = mne.time_frequency.psd_multitaper(self._raw.copy(), **kwargs)
-        self.freqs = fres
+        psds, freqs = mne.time_frequency.psd_multitaper(self._raw.copy())
+        self.freqs = freqs
 
     @property
     def slen(self) -> Optional[int]:
@@ -236,6 +238,8 @@ class PSDBinner(TransformerMixin, BaseEstimator):
     @slen.setter
     def slen(self, slen: Optional[int]):
         self._slen = slen
-        x: np.ndarray = np.ones((1, slen))
+        if self._slen is None:
+            return
+        x: np.ndarray = np.ones((1, cast(int, self._slen)))
         psds, freqs = mne.time_frequency.psd_array_multitaper(x, sfreq=self.sfreq)
         self.freqs = freqs
