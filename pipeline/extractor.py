@@ -7,12 +7,14 @@ from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
 
 class Extractor(TransformerMixin, BaseEstimator):
     """Data packets from the BCI system are collected in dataframes. This class
-    assists in the pipeline
+    assists in the pipeline by extracting the raw data from these dataframes
+    for use in scikit-learn and MNE pipelines
     """
 
-    def __init__(self):
+    def __init__(self, picks: List[int] = []):
         super(Extractor, self).__init__()
         self._data_column_name: str = "data"
+        self.picks: List[int] = picks
 
         # Uninitialized Variables
         self._X: np.ndarray
@@ -36,7 +38,13 @@ class Extractor(TransformerMixin, BaseEstimator):
 
     def transform(self, X: Union[List, pd.DataFrame]) -> np.ndarray:
         """transform an input of trial data in the form of a DataFrame into a
-        time-series feature set
+        multi dimensional array of (N x C x T) where:
+          - N = Number of Epochs or Instances
+          - C = Number of Channels
+          - T = Number of time points
+
+        If the sampling rates for the channels are different, then channels
+        with lower sampling frequencies are appended with np.nan
 
         Parameters
         ----------
@@ -47,23 +55,41 @@ class Extractor(TransformerMixin, BaseEstimator):
         Returns
         -------
         np.ndarray
-            an NxM matrix where N = number of packets and M is the number of
-            concatenated data points. M is the concatenated data from all
-            channels in sequential order. Thus by using `self._channel_info`
-            the data can be reseparated.
+            an NxCXxT matrix as described above
         """
         if type(X) is list:
-            trial_results: List = [
-                self.transform(x)
-                for x in X
-            ]
+            trial_results: List = [self.transform(x) for x in X]
             self._X = np.vstack(trial_results)
         else:
             self._data_column_name = self._resolve_data_column_name(X)
             self._channel_info = self._resolve_channel_info(X)
-            data: pd.Series = cast(pd.DataFrame, X).loc[:, self._data_column_name]
-            data = data.apply(lambda x: np.hstack(x))
-            self._X = np.vstack(data.values)
+            self._picked_channel_info = [self._channel_info[i] for i in self.picks]
+            to_ragged: bool = np.unique(self._picked_channel_info).size > 1
+            data = df["data"].values
+            if to_ragged:
+                max_size = np.max(self._picked_channel_info)
+                diff_channel_info = [
+                    max_size - self._channel_info[i]
+                    for i in range(len(self._channel_info))
+                ]
+                ret = np.array(
+                    [
+                        [
+                            ch + [np.nan] * diff_channel_info[i]
+                            for i, ch in enumerate(pkt)
+                            if i in self.picks
+                        ]
+                        for pkt in data
+                    ]
+                )
+            else:
+                ret = np.array(
+                    [
+                        [ch for i, ch in enumerate(pkt) if i in self.picks]
+                        for pkt in data
+                    ]
+                )
+            self._X = ret
         return self._X
 
     def _resolve_data_column_name(self, X: pd.DataFrame) -> str:
@@ -104,9 +130,6 @@ class Extractor(TransformerMixin, BaseEstimator):
         """
         packet: pd.Series = X.iloc[0, :]
         data: List = packet[self._data_column_name]
-        result: List[int] = [
-            len(ch)
-            for ch in data
-        ]
+        result: List[int] = [len(ch) for ch in data]
 
         return np.array(result)
