@@ -1,4 +1,4 @@
-from .chextractor import ChExtractor
+from . import inline
 from .extractor import Extractor
 from .featurizer import Featurizer
 from .filter import Filterer
@@ -6,12 +6,13 @@ from .psdbinner import PSDBinner
 from .transform_pipeline import TransformPipeline
 from .windower import Windower
 
-ChExtractor
 Extractor
 Featurizer
 Filterer
 PSDBinner
 Windower
+
+inline
 
 preprocessor = TransformPipeline(
     [
