@@ -15,19 +15,17 @@ class Windower(TransformerMixin, BaseEstimator):
 
     def __init__(
         self,
-        window_size: int = 8,
+        samples_per_window: int = 640,
         label_scheme: int = 0,
-        window_step: int = 1,
-        trial_size: int = 750,
-        packet_channel_sizes: List[int] = [80, 2, 80, 2],
-        filler: float = np.nan,
+        window_step: int = 80,
+        trial_size: int = 60000,
     ):
         """
 
         Parameters
         ----------
-        window_size : int
-            The number of packets to group into a window of data.
+        samples_per_window : int
+            The number of samples to group into a window of data.
             Ignored if `label_scheme == 4`
         label_scheme : int
             Indicates how the window should be labeled. Labeling schemes are as
@@ -51,11 +49,8 @@ class Windower(TransformerMixin, BaseEstimator):
             divided prior to windowing. This is the number of packets expected
             per trial
             Ignored if `label_scheme == 4`
-        packet_channel_sizes : List[int]
-            This lise has a value for every channel with data in each packet.
-            Each element of this list specifies that amount of data each
-            channel has stored in a packet (based off it's sampling rate)
         """
+        self.samples_per_window: int = samples_per_window
         self.window_size: int = window_size
         self.window_step: int = window_step
         self.trial_size: int = trial_size
@@ -68,7 +63,6 @@ class Windower(TransformerMixin, BaseEstimator):
         ]
         self._window_packets: np.ndarray = np.array([])
         self._n_packets: int = 0
-        self.filler: float = filler
 
         # Uninitialized variables to be defined alter
         self._n_windows: int
@@ -84,9 +78,9 @@ class Windower(TransformerMixin, BaseEstimator):
         Parameters
         ----------
         X : np.ndarray
-            An NxM matrix array of data were N is the number of packets and M
-            is the number of data points per packet. M maybe a concatenated
-            array of multiple channels as defined by self.packet_channel_sizes
+            An NxCxT matrix array of data were N is the number of epochs and C
+            is the number of channels and T is the number of data points per
+            epoch.
         y : np.ndarray
             An Nx1 matrix array that contains the corresponding labels for X
 

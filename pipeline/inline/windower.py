@@ -8,24 +8,25 @@ from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
 LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class ChWindower(TransformerMixin, BaseEstimator):
+class Windower(TransformerMixin, BaseEstimator):
     """Provides the blueprint for dividing the data into various widths of
     data
     """
 
     def __init__(
         self,
-        samples_per_window: int = 640
+        window_size: int = 8,
         label_scheme: int = 0,
-        window_step: int = 80,
-        trial_size: int = 60000,
+        window_step: int = 1,
+        trial_size: int = 750,
+        packet_channel_sizes: List[int] = [80, 2, 80, 2],
     ):
         """
 
         Parameters
         ----------
-        samples_per_window : int
-            The number of samples to group into a window of data.
+        window_size : int
+            The number of packets to group into a window of data.
             Ignored if `label_scheme == 4`
         label_scheme : int
             Indicates how the window should be labeled. Labeling schemes are as
@@ -49,8 +50,11 @@ class ChWindower(TransformerMixin, BaseEstimator):
             divided prior to windowing. This is the number of packets expected
             per trial
             Ignored if `label_scheme == 4`
+        packet_channel_sizes : List[int]
+            This lise has a value for every channel with data in each packet.
+            Each element of this list specifies that amount of data each
+            channel has stored in a packet (based off it's sampling rate)
         """
-        self.samples_per_window
         self.window_size: int = window_size
         self.window_step: int = window_step
         self.trial_size: int = trial_size
@@ -63,7 +67,6 @@ class ChWindower(TransformerMixin, BaseEstimator):
         ]
         self._window_packets: np.ndarray = np.array([])
         self._n_packets: int = 0
-        self.filler: float = filler
 
         # Uninitialized variables to be defined alter
         self._n_windows: int
@@ -219,7 +222,7 @@ class ChWindower(TransformerMixin, BaseEstimator):
             window_packets: np.ndarray = ch[selected_packet_idxs]
             if self.label_scheme == 4:
                 nan_data: np.ndarray = (
-                    np.ones([n_nan_packets, packet_channel_size]) * self.filler
+                    np.ones([n_nan_packets, packet_channel_size]) * np.nan
                 )
                 window_packets = np.r_[window_packets, nan_data]
             assert window_packets.shape == (
@@ -337,7 +340,3 @@ class ChWindower(TransformerMixin, BaseEstimator):
         self._trial_window_lengths = trial_window_lengths
         self._window_packets = np.vstack(trial_window_packets)
         return self._window_packets
-error: cannot format -: Cannot parse: 19:8:         label_scheme: int = 0,
-
-Oh no! 💥 💔 💥
-1 file failed to reformat.
