@@ -1,7 +1,7 @@
 import numpy as np
 
 from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 
 class Pairer(TransformerMixin, BaseEstimator):

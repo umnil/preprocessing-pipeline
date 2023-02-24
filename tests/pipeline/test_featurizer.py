@@ -4,10 +4,10 @@ import pandas as pd  # type: ignore
 
 from typing import Dict
 from scipy.fft import fft, fftfreq  # type: ignore
-from pipeline.extractor import Extractor
-from pipeline.windower import Windower
-from pipeline.filter import Filterer
-from pipeline.featurizer import Featurizer
+from pipeline.inline.extractor import Extractor
+from pipeline.inline.windower import Windower
+from pipeline.inline.filter import Filterer
+from pipeline.inline.featurizer import Featurizer
 
 
 def fftfilt(data, *args, **kwargs):
@@ -15,9 +15,9 @@ def fftfilt(data, *args, **kwargs):
     T = 1.0 / 200.0
 
     yf = fft(data)
-    xf = fftfreq(N, T)[:N//2]
+    xf = fftfreq(N, T)[: N // 2]
 
-    yf = 2.0/N * np.abs(yf[:, 0:N//2])
+    yf = 2.0 / N * np.abs(yf[:, 0 : N // 2])
 
     return yf, xf
 
@@ -57,8 +57,7 @@ class TestFeaturizer:
         X = w.fit_transform(X, y)
         y = w._y_hat
         f = Filterer(
-            window_channel_sizes=w._window_channel_size,
-            filter_args=filter_args
+            window_channel_sizes=w._window_channel_size, filter_args=filter_args
         )
         X = f.fit_transform(X, y)
         ft = Featurizer(window_channel_sizes=w._window_channel_size)
@@ -74,12 +73,12 @@ class TestFeaturizer:
         X = w.fit_transform(X, y)
         y = w._y_hat
         f = Filterer(
-            window_channel_sizes=w._window_channel_size,
-            filter_args=filter_args
+            window_channel_sizes=w._window_channel_size, filter_args=filter_args
         )
         X = f.fit_transform(X, y)
-        ft = Featurizer(window_channel_sizes=w._window_channel_size,
-                        spectral_func=fftfilt)
+        ft = Featurizer(
+            window_channel_sizes=w._window_channel_size, spectral_func=fftfilt
+        )
         X = ft.fit_transform(X)
 
         assert X.shape[0] == 296
