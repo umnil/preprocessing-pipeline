@@ -5,7 +5,9 @@ from typing import List, Tuple
 
 
 class MaskedPSDBinner(PSDBinner):
-    def transform(self, x: np.ma.core.MaskedArray, *args, **kwargs) -> np.ndarray:  # type: ignore
+    def transform(  # type: ignore
+        self, x: np.ma.core.MaskedArray, *args, **kwargs  # type: ignore
+    ) -> np.ndarray:  # type: ignore
         input_shape: Tuple = x.shape
         output_shape: List = list(input_shape[:-1]) + [len(self.bins)]
         x = x.reshape(-1, input_shape[-1])

@@ -48,7 +48,7 @@ class TransformPipeline(Pipeline):
                 X_hat = X_hat[~nan_mask]
                 y_hat = y_hat[~nan_mask]
 
-            # Validation
+            Validation
             assert X_hat.shape[0] == y_hat.shape[0], (
                 f"X_hat rows = {X.shape[0]}"
                 + f", while y_hat rows = {y.shape[0]}"
@@ -57,13 +57,11 @@ class TransformPipeline(Pipeline):
             )
             dims: List = list(X_hat.shape)
             for i, dim in enumerate(dims):
-                assert (
-                    dim > 0
-                ), (
-                        f"The {name} step (step #{step}) of the pipeline " +
-                        f"depleted the values in dimension {i} of the data " +
-                        "matrix"
-                    )
+                assert dim > 0, (
+                    f"The {name} step (step #{step}) of the pipeline "
+                    + f"depleted the values in dimension {i} of the data "
+                    + "matrix"
+                )
 
             X, y = X_hat, y_hat
 
