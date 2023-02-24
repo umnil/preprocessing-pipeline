@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd  # type: ignore
 
 from typing import List, Dict, Tuple
-from pipeline.extractor import Extractor
-from pipeline.windower import Windower
+from pipeline.inline.extractor import Extractor
+from pipeline.inline.windower import Windower
 
 
 class TestWindower:
@@ -131,7 +131,7 @@ class TestWindower:
         X = ex.fit_transform(sample_data, y)
         ch1_packets: np.ndarray = wn._get_channel_packets(X, 0)
         wn.fit(X, y)
-        assert wn._window_channel_size == [24880, 622]*2
+        assert wn._window_channel_size == [24880, 622] * 2
         out = wn._transform_channel(ch1_packets)
         assert out.shape == (17, 24880)
 
@@ -174,7 +174,7 @@ class TestWindower:
         assert window_packet_idxs.shape == (2, 5)
 
     def test_get_label_packets(self):
-        y: np.ndarray = np.hstack([[0]*5, [1]*5]*2)
+        y: np.ndarray = np.hstack([[0] * 5, [1] * 5] * 2)
         w: Windower = Windower(
             window_size=5, window_step=5, trial_size=10, packet_channel_sizes=[10, 4]
         )

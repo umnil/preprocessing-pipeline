@@ -1,20 +1,18 @@
 import numpy as np
 import pandas as pd  # type: ignore
 
-from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
 from typing import List, Union, cast
+from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
 
 
 class Extractor(TransformerMixin, BaseEstimator):
     """Data packets from the BCI system are collected in dataframes. This class
-    assists in the pipeline by extracting the raw data from these dataframes
-    for use in scikit-learn and MNE pipelines
+    assists in the pipeline
     """
 
-    def __init__(self, picks: List[int] = []):
+    def __init__(self) -> None:
         super(Extractor, self).__init__()
         self._data_column_name: str = "data"
-        self.picks: List[int] = picks
 
         # Uninitialized Variables
         self._X: np.ndarray
@@ -38,13 +36,7 @@ class Extractor(TransformerMixin, BaseEstimator):
 
     def transform(self, X: Union[List, pd.DataFrame]) -> np.ndarray:
         """transform an input of trial data in the form of a DataFrame into a
-        multi dimensional array of (N x C x T) where:
-          - N = Number of Epochs or Instances
-          - C = Number of Channels
-          - T = Number of time points
-
-        If the sampling rates for the channels are different, then channels
-        with lower sampling frequencies are appended with np.nan
+        time-series feature set
 
         Parameters
         ----------
@@ -55,7 +47,10 @@ class Extractor(TransformerMixin, BaseEstimator):
         Returns
         -------
         np.ndarray
-            an NxCXxT matrix as described above
+            an NxM matrix where N = number of packets and M is the number of
+            concatenated data points. M is the concatenated data from all
+            channels in sequential order. Thus by using `self._channel_info`
+            the data can be reseparated.
         """
         if type(X) is list:
             trial_results: List = [self.transform(x) for x in X]
@@ -63,33 +58,9 @@ class Extractor(TransformerMixin, BaseEstimator):
         else:
             self._data_column_name = self._resolve_data_column_name(X)
             self._channel_info = self._resolve_channel_info(X)
-            self._picked_channel_info = [self._channel_info[i] for i in self.picks]
-            to_ragged: bool = np.unique(self._picked_channel_info).size > 1
-            data = cast(pd.DataFrame, X)["data"].values
-            if to_ragged:
-                max_size = np.max(self._picked_channel_info)
-                diff_channel_info = [
-                    max_size - self._channel_info[i]
-                    for i in range(len(self._channel_info))
-                ]
-                ret = np.array(
-                    [
-                        [
-                            ch + [np.nan] * diff_channel_info[i]
-                            for i, ch in enumerate(pkt)
-                            if i in self.picks
-                        ]
-                        for pkt in data
-                    ]
-                )
-            else:
-                ret = np.array(
-                    [
-                        [ch for i, ch in enumerate(pkt) if i in self.picks]
-                        for pkt in data
-                    ]
-                )
-            self._X = ret
+            data: pd.Series = cast(pd.DataFrame, X).loc[:, self._data_column_name]
+            data = data.apply(lambda x: np.hstack(x))
+            self._X = np.vstack(data.values)
         return self._X
 
     def _resolve_data_column_name(self, X: pd.DataFrame) -> str:

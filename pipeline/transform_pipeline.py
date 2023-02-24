@@ -50,20 +50,18 @@ class TransformPipeline(Pipeline):
 
             # Validation
             assert X_hat.shape[0] == y_hat.shape[0], (
-                f"X_hat rows = {X.shape[0]}"
-                + f", while y_hat rows = {y.shape[0]}"
+                f"X_hat rows = {X_hat.shape[0]}"
+                + f", while y_hat rows = {y_hat.shape[0]}"
                 + f".\nStep: {name}"
-                + f".\n\n preprocessor: {self.transform_pipeline}"
+                + f".\n\n preprocessor: {self}"
             )
             dims: List = list(X_hat.shape)
             for i, dim in enumerate(dims):
-                assert (
-                    dim > 0
-                ), (
-                        f"The {name} step (step #{step}) of the pipeline " +
-                        f"depleted the values in dimension {i} of the data " +
-                        "matrix"
-                    )
+                assert dim > 0, (
+                    f"The {name} step (step #{step}) of the pipeline "
+                    + f"depleted the values in dimension {i} of the data "
+                    + "matrix"
+                )
 
             X, y = X_hat, y_hat
 

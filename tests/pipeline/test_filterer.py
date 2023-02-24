@@ -3,9 +3,9 @@ import numpy as np
 import pandas as pd  # type: ignore
 
 from typing import List
-from pipeline.extractor import Extractor
-from pipeline.windower import Windower
-from pipeline.filter import Filterer
+from pipeline.inline.extractor import Extractor
+from pipeline.inline.windower import Windower
+from pipeline.inline.filter import Filterer
 
 
 class TestFilterer:
@@ -57,7 +57,8 @@ class TestFilterer:
 
         f = Filterer(
             filter_args={"sfreq": 200, "l_freq": 1, "h_freq": None},
-            artifact_threshold=None)
+            artifact_threshold=None,
+        )
         X = f.fit_transform(X, y)
         assert f._y_hat is not None
 
@@ -77,7 +78,7 @@ class TestFilterer:
         channel_bounds: List = [
             [
                 0 if i == 0 else sum(window_channel_sizes[:i]),
-                sum(window_channel_sizes[:i+1])
+                sum(window_channel_sizes[: i + 1]),
             ]
             for i, x in enumerate(window_channel_sizes)
         ]

@@ -1,7 +1,7 @@
 import pandas as pd  # type: ignore
 
 from typing import List
-from . import Extractor, Windower
+from .inline import Extractor, Windower
 from .transform_pipeline import TransformPipeline
 
 
@@ -22,9 +22,8 @@ def calc_wcs(df: pd.DataFrame) -> List:
         Return a set of sizes for each channel in
         the set
     """
-    temp_pipeline: TransformPipeline = TransformPipeline([
-        ("ex", Extractor()),
-        ("wn", Windower(label_scheme=4))
-    ])
+    temp_pipeline: TransformPipeline = TransformPipeline(
+        [("ex", Extractor()), ("wn", Windower(label_scheme=4))]
+    )
     temp_pipeline.transform(df, df["prompt"].values)
     return temp_pipeline.steps[-1][-1]._window_channel_size
