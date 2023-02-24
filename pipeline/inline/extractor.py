@@ -10,7 +10,7 @@ class Extractor(TransformerMixin, BaseEstimator):
     assists in the pipeline
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super(Extractor, self).__init__()
         self._data_column_name: str = "data"
 
@@ -53,10 +53,7 @@ class Extractor(TransformerMixin, BaseEstimator):
             the data can be reseparated.
         """
         if type(X) is list:
-            trial_results: List = [
-                self.transform(x)
-                for x in X
-            ]
+            trial_results: List = [self.transform(x) for x in X]
             self._X = np.vstack(trial_results)
         else:
             self._data_column_name = self._resolve_data_column_name(X)
@@ -104,9 +101,6 @@ class Extractor(TransformerMixin, BaseEstimator):
         """
         packet: pd.Series = X.iloc[0, :]
         data: List = packet[self._data_column_name]
-        result: List[int] = [
-            len(ch)
-            for ch in data
-        ]
+        result: List[int] = [len(ch) for ch in data]
 
         return np.array(result)

@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd  # type: ignore
 
-from typing import List, Union
 from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
+from typing import List, Union, cast
 
 
 class Extractor(TransformerMixin, BaseEstimator):
@@ -65,7 +65,7 @@ class Extractor(TransformerMixin, BaseEstimator):
             self._channel_info = self._resolve_channel_info(X)
             self._picked_channel_info = [self._channel_info[i] for i in self.picks]
             to_ragged: bool = np.unique(self._picked_channel_info).size > 1
-            data = X["data"].values
+            data = cast(pd.DataFrame, X)["data"].values
             if to_ragged:
                 max_size = np.max(self._picked_channel_info)
                 diff_channel_info = [

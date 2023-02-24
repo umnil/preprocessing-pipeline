@@ -133,14 +133,14 @@ class Windower(TransformerMixin, BaseEstimator):
             y = y.flatten()
             yd = np.array([b - a for a, b in zip(y[1:], y[:-1])])
             yd = np.array([0] + (np.where(yd != 0)[0] + 1).tolist())
-            window_idxs = [list(range(a, b)) for a, b in zip(yd[:-1], yd[1:])]
+            window_idxs = np.array([list(range(a, b)) for a, b in zip(yd[:-1], yd[1:])])
             window_lengths = [len(i) for i in window_idxs]
             max_win_len = max(window_lengths)
-            x = [x[i] for i in window_idxs]
+            list_x = [x[i] for i in window_idxs]
             x = np.stack(
                 [
                     np.r_[i, np.ones((max_win_len - i.shape[0], n_channels)) * np.nan]
-                    for i in x
+                    for i in list_x
                 ]
             )
             x = np.swapaxes(x, 1, 2)
@@ -199,13 +199,15 @@ class Windower(TransformerMixin, BaseEstimator):
             delta_y = np.array([b - a for a, b in zip(y[:-1], y[1:])])
             trans_y = np.where(delta_y != 0)[0] + 1
             delta_idxs = np.array([0] + trans_y.tolist())
-            window_idxs = [
+            window_list_idxs = [
                 list(range(a, b)) for a, b in zip(delta_idxs[:-1], delta_idxs[1:])
             ]
-            window_lengths = [len(i) for i in window_idxs]
+            window_lengths = [len(i) for i in window_list_idxs]
             max_win_len = max(window_lengths)
-            y = [y[i] for i in window_idxs]
-            y = np.array([i.tolist() + [np.nan] * (max_win_len - i.size) for i in y])
+            list_y = [y[i] for i in window_list_idxs]
+            y = np.array(
+                [i.tolist() + [np.nan] * (max_win_len - i.size) for i in list_y]
+            )
             y = y[:, 0]
             y_transformed = y
 
@@ -328,52 +330,3 @@ class Windower(TransformerMixin, BaseEstimator):
             ragid_matrix[i] = row + [np.nan] * diff
 
         return np.array(ragid_matrix)
-
-    @property
-    def window_packets(self) -> np.ndarray:
-        """A list of packet indicies for each window. This is actually where
-        the bulk of the logic for windowing is performed. All the other
-        matrices are fit to this window packet formation.
-        """
-        # use cached value if
-        if (
-            # there is a value that's been cached
-            (self._window_packets.size > 0)
-            # and the windowing parameters haven't been changed
-            and (self._window_packet_size == self.window_size * self.packet_size)
-            # and the number of packets to transform hasn't changed
-            and (self._n_packets == self._y.shape[0])
-        ):
-            return self._window_packets
-
-        self._n_packets = self._y.shape[0]
-        self.packet_size = sum(self.packet_channel_sizes)
-        self._window_packet_size = self.window_size * self.packet_size
-
-        trial_window_packets: List = []
-        trial_window_lengths: List = []
-        if self.label_scheme < 4:
-            n_trials: int = self._n_packets // self.trial_size
-            if n_trials == 0:
-                LOGGER.warn(
-                    f"No trials found, reshifiting trial size to {self._y.shape[0]}"
-                )
-                self._trial_size_original = self.trial_size
-                self.trial_size = self._y.shape[0]
-                n_trials = 1
-            for trial_idx in range(n_trials):
-                window_packets: np.ndarray = self.get_trial_window_packets(trial_idx)
-                trial_window_lengths.append(window_packets.shape[0])
-                trial_window_packets.append(window_packets)
-            self.trial_size = (
-                self.trial_size
-                if not hasattr(self, "_trail_size_original")
-                else self._trial_size_original
-            )
-        else:
-            trial_window_packets = self.get_label_packets().tolist()
-            trial_window_lengths = [len(trial_window_packets)]
-
-        self._trial_window_lengths = trial_window_lengths
-        self._window_packets = np.vstack(trial_window_packets)
-        return self._window_packets

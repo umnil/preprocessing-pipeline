@@ -1,7 +1,8 @@
 from . import inline
 from .extractor import Extractor
-from .featurizer import Featurizer
-from .filter import Filterer
+from .inline.featurizer import Featurizer
+from .inline.filter import Filterer
+from .masked import Masker, PSDEstimator, TemporalFilter
 from .psdbinner import PSDBinner
 from .transform_pipeline import TransformPipeline
 from .windower import Windower
@@ -9,7 +10,10 @@ from .windower import Windower
 Extractor
 Featurizer
 Filterer
+Masker
 PSDBinner
+PSDEstimator
+TemporalFilter
 Windower
 
 inline
