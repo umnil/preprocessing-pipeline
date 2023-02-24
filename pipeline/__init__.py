@@ -4,6 +4,7 @@ from .extractor import Extractor
 from .inline.featurizer import Featurizer
 from .inline.filter import Filterer
 from .masked import Masker
+from .pairer import Pairer
 from .psdbinner import PSDBinner
 from .transform_pipeline import TransformPipeline
 from .windower import Windower
@@ -12,6 +13,7 @@ Extractor
 Featurizer
 Filterer
 Masker
+Pairer
 PSDBinner
 Windower
 

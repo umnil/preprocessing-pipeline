@@ -5,9 +5,10 @@ from typing import List, Tuple
 
 
 class PSDBinner(TransformerMixin, BaseEstimator):
-    def __init__(self, bins: List, sfreq: int):
+    def __init__(self, bins: List, sfreq: int, select_bins: List = []):
         self.bins: List = bins
         self.sfreq: int = sfreq
+        self.select_bins: List = select_bins
 
     def fit(self, *args, **kwargs) -> "PSDBinner":
         return self
@@ -23,4 +24,6 @@ class PSDBinner(TransformerMixin, BaseEstimator):
         ]
         x = np.array([[i[f].mean() for f in fi] for i, fi in zip(x, freq_idxs)])
         x = x.reshape(output_shape)
+        if len(self.select_bins) > 0:
+            x = x[..., self.select_bins]
         return x
