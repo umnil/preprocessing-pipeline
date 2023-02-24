@@ -48,12 +48,12 @@ class TransformPipeline(Pipeline):
                 X_hat = X_hat[~nan_mask]
                 y_hat = y_hat[~nan_mask]
 
-            Validation
+            # Validation
             assert X_hat.shape[0] == y_hat.shape[0], (
-                f"X_hat rows = {X.shape[0]}"
-                + f", while y_hat rows = {y.shape[0]}"
+                f"X_hat rows = {X_hat.shape[0]}"
+                + f", while y_hat rows = {y_hat.shape[0]}"
                 + f".\nStep: {name}"
-                + f".\n\n preprocessor: {self.transform_pipeline}"
+                + f".\n\n preprocessor: {self}"
             )
             dims: List = list(X_hat.shape)
             for i, dim in enumerate(dims):

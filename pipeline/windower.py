@@ -110,8 +110,9 @@ class Windower(TransformerMixin, BaseEstimator):
             window_size`
         """
         x = X
+        # place channels up front to preserve their order and flatten
+        # everything else
         x = np.swapaxes((x), 0, 1)
-
         n_channels = x.shape[0]
         x = x.reshape(n_channels, -1)
 
@@ -129,10 +130,10 @@ class Windower(TransformerMixin, BaseEstimator):
             x = np.swapaxes(x, -1, -2)
         else:
             y = self._y
-            y = np.array(y.tolist() * 80).reshape(80, -1).T
+            y = np.array(y.tolist() * self._t).reshape(self._t, -1).T
             y = y.flatten()
             yd = np.array([b - a for a, b in zip(y[1:], y[:-1])])
-            yd = np.array([0] + (np.where(yd != 0)[0] + 1).tolist())
+            yd = np.array([0] + (np.where(yd != 0)[0] + 1).tolist() + [y.size])
             window_idxs = np.array([list(range(a, b)) for a, b in zip(yd[:-1], yd[1:])])
             window_lengths = [len(i) for i in window_idxs]
             max_win_len = max(window_lengths)
@@ -198,7 +199,7 @@ class Windower(TransformerMixin, BaseEstimator):
             y = self._y
             delta_y = np.array([b - a for a, b in zip(y[:-1], y[1:])])
             trans_y = np.where(delta_y != 0)[0] + 1
-            delta_idxs = np.array([0] + trans_y.tolist())
+            delta_idxs = np.array([0] + trans_y.tolist() + [y.size])
             window_list_idxs = [
                 list(range(a, b)) for a, b in zip(delta_idxs[:-1], delta_idxs[1:])
             ]
