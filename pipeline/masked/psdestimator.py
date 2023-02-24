@@ -1,7 +1,7 @@
 import numpy as np
 
-from mne.decoding import PSDEstimator
-from typing import Tuple
+from mne.decoding import PSDEstimator  # type: ignore
+from typing import List, Tuple
 
 
 class MaskedPSDEstimator(PSDEstimator):
@@ -14,7 +14,7 @@ class MaskedPSDEstimator(PSDEstimator):
         list_x: List = [
             super(MaskedPSDEstimator, self).transform(i[~i.mask]) for i in x
         ]
-        x = np.array([np.concatenate([i, [np.nan] * (df - i.size)]) for i in list_x])
-        x = np.ma.masked_invalid(x)
+        np_x = np.array([np.concatenate([i, [np.nan] * (df - i.size)]) for i in list_x])
+        x = np.ma.masked_invalid(np_x)
         x = x.reshape(output_shape)
         return x

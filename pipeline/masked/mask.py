@@ -1,6 +1,6 @@
 import numpy as np
 
-from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
 
 
 class Masker(TransformerMixin, BaseEstimator):

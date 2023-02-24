@@ -1,8 +1,9 @@
 from . import inline
+from . import masked
 from .extractor import Extractor
 from .inline.featurizer import Featurizer
 from .inline.filter import Filterer
-from .masked import Masker, PSDEstimator, TemporalFilter
+from .masked import Masker
 from .psdbinner import PSDBinner
 from .transform_pipeline import TransformPipeline
 from .windower import Windower
@@ -12,11 +13,10 @@ Featurizer
 Filterer
 Masker
 PSDBinner
-PSDEstimator
-TemporalFilter
 Windower
 
 inline
+masked
 
 preprocessor = TransformPipeline(
     [
