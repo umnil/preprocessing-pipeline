@@ -18,4 +18,6 @@ class MaskedPSDBinner(PSDBinner):
         ]
         np_x = np.array([[i[f].mean() for f in fi] for i, fi in zip(x, freq_idxs)])
         np_x = np_x.reshape(output_shape)
+        if len(self.select_bins) > 0:
+            np_x = np_x[..., self.select_bins]
         return np_x
