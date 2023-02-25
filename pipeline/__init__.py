@@ -3,6 +3,7 @@ from . import masked
 from .extractor import Extractor
 from .masked import Masker
 from .pairer import Pairer
+from .polydetrend import PolyDetrend
 from .psdbinner import PSDBinner
 from .transform_pipeline import TransformPipeline
 from .windower import Windower
@@ -10,6 +11,7 @@ from .windower import Windower
 Extractor
 Masker
 Pairer
+PolyDetrend
 PSDBinner
 Windower
 
