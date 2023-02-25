@@ -2,7 +2,7 @@ from setuptools import setup, find_packages  # type: ignore
 
 setup(
     name="preprocessing-pipeline",
-    version="0.1.1",
+    version="0.1.2",
     description="Preprocessing pipeline for neural feature extraction",
     author="Kevin Davis",
     author_email="kevin.davis@miami.edu",
