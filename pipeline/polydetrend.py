@@ -4,6 +4,7 @@ from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
 from sklearn.pipeline import Pipeline  # type: ignore
 from sklearn.preprocessing import PolynomialFeatures  # type: ignore
 from sklearn.linear_model import LinearRegression  # type: ignore
+from typing import List, Tuple
 
 
 class PolyDetrend(TransformerMixin, BaseEstimator):

@@ -1,10 +1,10 @@
 import numpy as np
-from typing import Tuple
+from typing import List, Tuple
 from ..polydetrend import PolyDetrend
 
 
 class MaskedPolyDetrend(PolyDetrend):
-    def transform(
+    def transform(  # type: ignore
         self, x: np.ma.core.MaskedArray, *args, **kwargs
     ) -> np.ma.core.MaskedArray:
         input_shape: Tuple = x.shape
