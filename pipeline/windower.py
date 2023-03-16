@@ -139,7 +139,7 @@ class Windower(TransformerMixin, BaseEstimator):
             ]
             window_lengths = [len(i) for i in window_idxs_list]
             max_win_len = max(window_lengths)
-            list_x = [x[i] for i in window_idxs]
+            list_x = [x[i] for i in window_idxs_list]
             x = np.stack(
                 [
                     np.r_[i, np.ones((max_win_len - i.shape[0], n_channels)) * np.nan]
