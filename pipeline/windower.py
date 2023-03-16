@@ -134,8 +134,10 @@ class Windower(TransformerMixin, BaseEstimator):
             y = y.flatten()
             yd = np.array([b - a for a, b in zip(y[1:], y[:-1])])
             yd = np.array([0] + (np.where(yd != 0)[0] + 1).tolist() + [y.size])
-            window_idxs = np.array([list(range(a, b)) for a, b in zip(yd[:-1], yd[1:])])
-            window_lengths = [len(i) for i in window_idxs]
+            window_idxs_list: List = [
+                list(range(a, b)) for a, b in zip(yd[:-1], yd[1:])
+            ]
+            window_lengths = [len(i) for i in window_idxs_list]
             max_win_len = max(window_lengths)
             list_x = [x[i] for i in window_idxs]
             x = np.stack(
