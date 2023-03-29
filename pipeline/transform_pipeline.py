@@ -44,7 +44,7 @@ class TransformPipeline(Pipeline):
 
             # Check for nan
             if np.isnan(y_hat.astype(np.float64)).any():
-                nan_mask = np.isnan(y_hat).astype(np.int64)
+                nan_mask = np.isnan(y_hat)
                 X_hat = X_hat[~nan_mask]
                 y_hat = y_hat[~nan_mask]
 
