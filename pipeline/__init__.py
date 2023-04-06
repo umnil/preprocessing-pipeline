@@ -1,6 +1,7 @@
 from . import inline
 from . import masked
 from .extractor import Extractor
+from .function_transformer import FunctionTransformer as TFunctionTransformer
 from .masked import Masker
 from .pairer import Pairer
 from .polydetrend import PolyDetrend
@@ -13,6 +14,7 @@ Masker
 Pairer
 PolyDetrend
 PSDBinner
+TFunctionTransformer
 Windower
 
 inline
