@@ -1,4 +1,8 @@
-from sklearn.preprocessing import FunctionTransformer as FT
+from sklearn.preprocessing import FunctionTransformer as FT  # type: ignore
+
+
+def identity(x):
+    return x
 
 
 class FunctionTransformer(FT):
@@ -8,7 +12,7 @@ class FunctionTransformer(FT):
 
     def _transform(self, x, y, func=None, kw_args=None):
         if func is None:
-            func = lambda x: x
+            func = identity
 
         self._x_hat, self._y_hat = func(x, y, **(kw_args if kw_args else {}))
         return self._x_hat
