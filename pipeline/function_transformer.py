@@ -6,6 +6,9 @@ def identity(x):
 
 
 class FunctionTransformer(FT):
+    def fit_transform(self, x, y):
+        return self.fit(x, y).transform(x, y)
+
     def transform(self, x, y):
         x = self._check_input(x, reset=False)
         return self._transform(x, y, func=self.func, kw_args=self.kw_args)
