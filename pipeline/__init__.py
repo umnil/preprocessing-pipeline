@@ -1,5 +1,6 @@
 from . import inline
 from . import masked
+from .artifact_remover import ArtifactRemover
 from .extractor import Extractor
 from .function_transformer import FunctionTransformer as TFunctionTransformer
 from .masked import Masker
@@ -9,6 +10,7 @@ from .psdbinner import PSDBinner
 from .transform_pipeline import TransformPipeline
 from .windower import Windower
 
+ArtifactRemover
 Extractor
 Masker
 Pairer
