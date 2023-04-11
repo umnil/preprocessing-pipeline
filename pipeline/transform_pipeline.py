@@ -36,6 +36,7 @@ class TransformPipeline(Pipeline):
         """
         self.X_original: np.ndarray = X
         self.y_original: np.ndarray = y
+        self.results: List[Tuple] = []
 
         X_hat: np.ndarray
         y_hat: np.ndarray
@@ -63,6 +64,7 @@ class TransformPipeline(Pipeline):
                     + "matrix"
                 )
 
+            self.results.append((X_hat, y_hat))
             X, y = X_hat, y_hat
 
         return (X_hat, y_hat)
