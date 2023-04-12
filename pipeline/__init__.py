@@ -1,5 +1,6 @@
 from . import inline
 from . import masked
+from . import mne
 from .artifact_remover import ArtifactRemover
 from .extractor import Extractor
 from .function_transformer import FunctionTransformer as TFunctionTransformer
@@ -21,6 +22,7 @@ Windower
 
 inline
 masked
+mne
 
 preprocessor = TransformPipeline(
     [
