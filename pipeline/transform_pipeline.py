@@ -1,14 +1,14 @@
 import pickle
 import numpy as np
 
-from typing import Tuple, IO, Dict, Any, List
+from typing import Tuple, IO, Dict, Any, List, Optional
 from datetime import datetime
 
 from sklearn.base import clone  # type: ignore
 from sklearn.pipeline import Pipeline  # type: ignore
-from sklearn.utils import _print_elapsed_time  # type : ignore
-from sklearn.utils.metaestimators import available_if  # type : ignore
-from sklearn.utils.validation import check_memory  # type : ignore
+from sklearn.utils import _print_elapsed_time  # type: ignore
+from sklearn.utils.metaestimators import available_if  # type: ignore
+from sklearn.utils.validation import check_memory  # type: ignore
 
 
 def _final_estimator_has(attr):
@@ -24,9 +24,9 @@ def _final_estimator_has(attr):
 
 
 class TransformPipeline(Pipeline):
-    def _fit(self, X: np.ndarray, y: np.ndarray = None, **fit_params_steps):
+    def _fit(self, X: np.ndarray, y: Optional[np.ndarray] = None, **fit_params_steps):
         # shallow copy of steps - this should really be steps_
-        self.steps = list(self.steps)
+        self.steps: List = list(self.steps)
         self._validate_steps()
         # Setup the memory
         memory = check_memory(self.memory)
@@ -62,7 +62,7 @@ class TransformPipeline(Pipeline):
             self.steps[step_idx] = (name, fitted_transformer)
         return X, y
 
-    def fit(self, X: np.ndarray, y: np.ndarray = None, **fit_params):
+    def fit(self, X: np.ndarray, y: Optional[np.ndarray] = None, **fit_params):
         """Fit the model.
         Fit all the transformers one after the other and transform the
         data. Finally, fit the transformed data using the final estimator.
