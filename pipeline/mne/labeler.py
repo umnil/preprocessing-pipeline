@@ -1,8 +1,9 @@
 import mne  # type: ignore
 import numpy as np
+import pandas as pd  # type: ignore
 
 from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
-from typing import List
+from typing import List, Optional, Union
 
 
 class Labeler(TransformerMixin, BaseEstimator):
@@ -11,46 +12,81 @@ class Labeler(TransformerMixin, BaseEstimator):
     Windowing object can perform the appropraite windowing
     """
 
-    def fit(self, x: mne.io.Raw, *args, **kwargs) -> "Labeler":
+    def __init__(self, labels: Optional[List] = None):
+        """Initialize a labeler that will search for the labels specified in
+        `labels`
+
+        Parameters
+        ----------
+        labels : Optional[List]
+            Labels
+        """
+        self.labels: Optional[List[str]] = labels
+
+    def fit(self, x: Union[mne.io.Raw, List[mne.io.Raw]], *args, **kwargs) -> "Labeler":
         """Fit the labeler to the raw data
 
         Parameters
         ----------
-        x : mne.io.Raw
-            The mne raw object with annotations
+        x : Union[mne.io.Raw, List[mne.io.Raw]]
+            The mne raw object with annotations or a list of them
 
         Returns
         -------
         Labeler
             self
         """
-        self.sfreq: int = x.info["sfreq"]
-        data: np.ndarray = x.get_data()
-        n_samples: int = data.shape[-1]
-        labels: np.ndarray = np.array(["None"] * n_samples)
-        n_annotations: int = len(x.annotations.description)
-        for i in range(n_annotations):
-            onset: float = x.annotations.onset[i]
-            duration: float = x.annotations.duration[i]
-            description: str = x.annotations.description[i]
+        if isinstance(x, List):
+            self._y_hat = np.concatenate([self.load_labels(i) for i in x])
+        else:
+            self._y_hat = self.load_labels(x)
+        return self
 
-            onset_samples: int = int(np.round(onset * self.sfreq))
-            duration_samples: int = int(np.round(duration * self.sfreq))
+    def load_labels(self, raw: mne.io.Raw) -> np.ndarray:
+        """Load the labels from an individual raw object
+
+        Parameters
+        ----------
+        raw : mne.io.Raw
+            The raw mne object containing the data
+
+        Returns
+        -------
+        np.ndarray
+            A list of labels for each data point
+        """
+        sfreq: int = raw.info["sfreq"]
+        data: np.ndarray = raw.get_data()
+        n_samples: int = data.shape[-1]
+        y_labels: np.ndarray = np.array(["None"] * n_samples)
+        n_annotations: int = len(raw.annotations.description)
+        for i in range(n_annotations):
+            onset: float = raw.annotations.onset[i]
+            duration: float = raw.annotations.duration[i]
+            description: str = raw.annotations.description[i]
+
+            onset_samples: int = int(np.round(onset * sfreq))
+            duration_samples: int = int(np.round(duration * sfreq))
             begin: int = onset_samples
             end: int = onset_samples + duration_samples
             n_label_samples: int = end - begin
             label_seg: List[str] = [description] * n_label_samples
-            labels[begin:end] = label_seg
+            y_labels[begin:end] = label_seg
 
-        self._y_hat: np.ndarray = np.unique(labels, return_inverse=True)[1]
-        return self
+        retval: np.ndarray
+        if self.labels is not None:
+            retval = pd.Categorical(y_labels, self.labels).codes
+        else:
+            retval = np.unique(y_labels, return_inverse=True)[1]
 
-    def transform(self, x: mne.io.Raw) -> np.ndarray:
+        return retval
+
+    def transform(self, x: Union[mne.io.Raw, List[mne.io.Raw]]) -> np.ndarray:
         """Transform an mne.Raw object into individual data and labels
 
         Parameters
         ----------
-        x : mne.io.Raw
+        x : Union[mne.io.Raw, List[mne.io.Raw]]
             The mne Rae object that contains data and annotations
 
         Returns
@@ -58,6 +94,15 @@ class Labeler(TransformerMixin, BaseEstimator):
         np.ndarry
             Shape of (time, channels, 1)
         """
-        data: np.ndarray = x.get_data()
-        self._x_hat = np.moveaxis(np.expand_dims(data, -1), 0, 1)
+        data: np.ndarray
+        if isinstance(x, List):
+            data_list: List[np.ndarray] = []
+            for i in x:
+                data = i.get_data()
+                data = np.moveaxis(np.expand_dims(data, -1), 0, 1)
+                data_list.append(data)
+            self._x_hat = np.concatenate(data_list)
+        else:
+            data = x.get_data()
+            self._x_hat = np.moveaxis(np.expand_dims(data, -1), 0, 1)
         return self._x_hat
