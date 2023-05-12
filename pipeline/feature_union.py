@@ -35,4 +35,4 @@ class TransformFeatureUnion(FeatureUnion):
             # All transformers are None
             return np.zeros((x.shape[0], 0)), ys
 
-        return self._hstack(xs), ys
+        return self._hstack(xs), next(iter(ys))
