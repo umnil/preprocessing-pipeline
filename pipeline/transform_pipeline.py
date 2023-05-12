@@ -265,6 +265,14 @@ class TransformPipeline(Pipeline):
             raise e
 
 
+def _transform_one(transformer, X, y, weight, **fit_params):
+    res_x, res_y = transformer.transform(X, y)
+    # if we have a weight for this transformer, multiply output
+    if weight is None:
+        return res_x, res_y
+    return res_x * weight, res_y
+
+
 def _fit_transform_one(
     transformer, X, y, weight, message_clsname="", message=None, **fit_params
 ):
