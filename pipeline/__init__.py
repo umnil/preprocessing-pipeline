@@ -3,6 +3,7 @@ from . import masked
 from . import mne
 from .artifact_remover import ArtifactRemover
 from .extractor import Extractor
+from .feature_union import TransformFeatureUnion
 from .function_transformer import FunctionTransformer as TFunctionTransformer
 from .interpolator import Interpolator
 from .masked import Masker
@@ -20,6 +21,7 @@ Pairer
 PolyDetrend
 PSDBinner
 TFunctionTransformer
+TransformFeatureUnion
 Windower
 
 inline
