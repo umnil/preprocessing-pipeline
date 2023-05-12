@@ -1,7 +1,7 @@
 import numpy as np
 
-from sklearn.pipeline import FeatureUnion
-from sklearn.utils.parallel import Parallel, delayed
+from sklearn.pipeline import FeatureUnion  # type: ignore
+from sklearn.utils.parallel import Parallel, delayed  # type: ignore
 from .transform_pipeline import _transform_one
 
 
