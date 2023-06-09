@@ -12,7 +12,7 @@ class Labeler(TransformerMixin, BaseEstimator):
     Windowing object can perform the appropraite windowing
     """
 
-    def __init__(self, labels: Optional[List] = None):
+    def __init__(self, labels: Optional[List] = None, channels: Optional[List] = None):
         """Initialize a labeler that will search for the labels specified in
         `labels`
 
@@ -20,8 +20,11 @@ class Labeler(TransformerMixin, BaseEstimator):
         ----------
         labels : Optional[List]
             Labels
+        channels : Optional[List]
+            Channels to pick
         """
         self.labels: Optional[List[str]] = labels
+        self.channels: Optional[List[int]] = channels
 
     def fit(self, x: Union[mne.io.Raw, List[mne.io.Raw]], *args, **kwargs) -> "Labeler":
         """Fit the labeler to the raw data
@@ -58,7 +61,7 @@ class Labeler(TransformerMixin, BaseEstimator):
         sfreq: int = raw.info["sfreq"]
         data: np.ndarray = raw.get_data()
         n_samples: int = data.shape[-1]
-        y_labels: np.ndarray = np.array(["None"] * n_samples)
+        y_labels: List = ["None"] * n_samples
         n_annotations: int = len(raw.annotations.description)
         for i in range(n_annotations):
             onset: float = raw.annotations.onset[i]
@@ -79,6 +82,8 @@ class Labeler(TransformerMixin, BaseEstimator):
         else:
             retval = np.unique(y_labels, return_inverse=True)[1]
 
+        retval = retval.astype(np.float64)
+        retval[retval == -1] = np.nan
         return retval
 
     def transform(self, x: Union[mne.io.Raw, List[mne.io.Raw]]) -> np.ndarray:
@@ -98,11 +103,13 @@ class Labeler(TransformerMixin, BaseEstimator):
         if isinstance(x, List):
             data_list: List[np.ndarray] = []
             for i in x:
+                i = i.copy() if self.channels is None else i.copy().pick(*self.channels)
                 data = i.get_data()
                 data = np.moveaxis(np.expand_dims(data, -1), 0, 1)
                 data_list.append(data)
             self._x_hat = np.concatenate(data_list)
         else:
+            x = x.copy() if self.channels is None else x.copy().pick(*self.channels)
             data = x.get_data()
             self._x_hat = np.moveaxis(np.expand_dims(data, -1), 0, 1)
         return self._x_hat
