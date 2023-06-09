@@ -103,15 +103,13 @@ class Labeler(TransformerMixin, BaseEstimator):
         if isinstance(x, List):
             data_list: List[np.ndarray] = []
             for i in x:
-                data = (
-                    i.copy() if self.channels is None else i.copy().pick(*self.channels)
-                )
+                i = i.copy() if self.channels is None else i.copy().pick(*self.channels)
                 data = i.get_data()
                 data = np.moveaxis(np.expand_dims(data, -1), 0, 1)
                 data_list.append(data)
             self._x_hat = np.concatenate(data_list)
         else:
-            data = x.copy() if self.channels is None else x.copy().pick(*self.channels)
-            data = data.get_data()
+            x = x.copy() if self.channels is None else x.copy().pick(*self.channels)
+            data = x.get_data()
             self._x_hat = np.moveaxis(np.expand_dims(data, -1), 0, 1)
         return self._x_hat
