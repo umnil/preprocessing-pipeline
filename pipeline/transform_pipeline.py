@@ -127,9 +127,13 @@ class TransformPipeline(Pipeline):
                 return Xt, yt
             fit_params_last_step = fit_params_steps[self.steps[-1][0]]
             if hasattr(last_step, "fit_transform"):
-                return last_step.fit_transform(Xt, yt, **fit_params_last_step)
+                x_hat = last_step.fit_transform(Xt, yt, **fit_params_last_step)
             else:
-                return last_step.fit(Xt, yt, **fit_params_last_step).transform(Xt)
+                x_hat = last_step.fit(Xt, yt, **fit_params_last_step).transform(Xt)
+            self._y_hat = (
+                yt if not hasattr(last_step, "_y_hat") else getattr(last_step, "_y_hat")
+            )
+            return x_hat
 
     @available_if(_final_estimator_has("score"))
     def score(self, X, y=None, sample_weight=None):
@@ -245,6 +249,7 @@ class TransformPipeline(Pipeline):
             X_hat = step.fit_transform(X, y)
             y_hat = y if not hasattr(step, "_y_hat") else getattr(step, "_y_hat")
 
+            self._y_hat = y_hat
             return (X_hat, y_hat)
         except Exception as e:
             if debug:
