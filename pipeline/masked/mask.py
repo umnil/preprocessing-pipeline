@@ -17,9 +17,4 @@ class Masker(TransformerMixin, BaseEstimator):
         else:
             ret = np.ma.masked_values(x, self.filler)
         ret.harden_mask()
-
-        def set_params(self, **params):
-        # Set the parameters of the pipeline
-            for filler, value in params.items():
-                setattr(self, filler, value)
         return ret

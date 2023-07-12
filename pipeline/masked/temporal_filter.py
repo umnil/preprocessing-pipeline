@@ -4,7 +4,7 @@ from mne.decoding import TemporalFilter  # type: ignore
 from typing import Tuple
 
 
-class MaskedTemporalFilter(TemporalFilter):
+class MaskedTemporalFilter(TemporalFilter,TransformerMixin, BaseEstimator):
     def transform(self, x: np.ma.core.MaskedArray) -> np.ma.core.MaskedArray:
         """Filter data along the last dimension and account for masking
 
