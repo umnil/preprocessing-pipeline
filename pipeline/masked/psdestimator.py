@@ -4,7 +4,7 @@ from mne.decoding import PSDEstimator  # type: ignore
 from typing import List, Tuple
 
 
-class MaskedPSDEstimator(PSDEstimator):
+class MaskedPSDEstimator(PSDEstimator,BaseEstimator):
     def transform(self, x: np.ma.core.MaskedArray, **kwargs) -> np.ma.core.MaskedArray:
         input_shape: Tuple = x.shape
         t: int = input_shape[-1]

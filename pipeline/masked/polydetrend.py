@@ -3,7 +3,7 @@ from typing import List, Tuple
 from ..polydetrend import PolyDetrend
 
 
-class MaskedPolyDetrend(PolyDetrend):
+class MaskedPolyDetrend(PolyDetrend,BaseEstimator):
     def transform(  # type: ignore
         self, x: np.ma.core.MaskedArray, *args, **kwargs
     ) -> np.ma.core.MaskedArray:
