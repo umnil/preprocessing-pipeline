@@ -2,7 +2,7 @@ import numpy as np
 
 from ..psdbinner import PSDBinner
 from typing import List, Tuple
-
+from sklearn.base import BaseEstimator
 
 class MaskedPSDBinner(PSDBinner,BaseEstimator):
     def transform(  # type: ignore

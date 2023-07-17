@@ -2,6 +2,7 @@ import numpy as np
 
 from mne.decoding import TemporalFilter  # type: ignore
 from typing import Tuple
+from sklearn.base import BaseEstimator
 #issue area
 
 class MaskedTemporalFilter(TemporalFilter,TransformerMixin, BaseEstimator):

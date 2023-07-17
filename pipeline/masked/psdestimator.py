@@ -2,7 +2,7 @@ import numpy as np
 
 from mne.decoding import PSDEstimator  # type: ignore
 from typing import List, Tuple
-
+from sklearn.base import BaseEstimator
 
 class MaskedPSDEstimator(PSDEstimator,BaseEstimator):
     def transform(self, x: np.ma.core.MaskedArray, **kwargs) -> np.ma.core.MaskedArray:

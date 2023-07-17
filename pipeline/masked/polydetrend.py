@@ -1,7 +1,7 @@
 import numpy as np
 from typing import List, Tuple
 from ..polydetrend import PolyDetrend
-
+from sklearn.base import BaseEstimator
 
 class MaskedPolyDetrend(PolyDetrend,BaseEstimator):
     def transform(  # type: ignore
