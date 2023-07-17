@@ -2,7 +2,7 @@ import numpy as np
 
 from mne.decoding import TemporalFilter  # type: ignore
 from typing import Tuple
-
+#issue area
 
 class MaskedTemporalFilter(TemporalFilter,TransformerMixin, BaseEstimator):
     def transform(self, x: np.ma.core.MaskedArray) -> np.ma.core.MaskedArray:
