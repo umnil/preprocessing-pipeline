@@ -27,4 +27,5 @@ class MaskedTemporalFilter(TemporalFilter,TransformerMixin, BaseEstimator):
         np_x = np.array([np.concatenate([i, [np.nan] * (t - i.size)]) for i in list_x])
         x = np.ma.masked_invalid(np_x)
         x = x.reshape(input_shape)
+        self.verbose = None
         return x
