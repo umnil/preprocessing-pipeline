@@ -6,9 +6,10 @@ from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
 #issue area
 
 class MaskedTemporalFilter(TemporalFilter,TransformerMixin, BaseEstimator):
-    def __init__(self):
+    def __init__(self,*args, **kwargs):
         self.verbose = None
-    def transform(self, x: np.ma.core.MaskedArray) -> np.ma.core.MaskedArray:
+       # super().__init__()
+    def transform(self, x: np.ma.core.MaskedArray,*args, **kwargs) -> np.ma.core.MaskedArray:
         """Filter data along the last dimension and account for masking
 
         Parameters
