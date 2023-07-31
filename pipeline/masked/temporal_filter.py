@@ -2,14 +2,41 @@ import numpy as np
 
 from mne.decoding import TemporalFilter  # type: ignore
 from typing import Tuple
-from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
-#issue area
 
-class MaskedTemporalFilter(TemporalFilter,TransformerMixin, BaseEstimator):
-       # super().__init__()
-    def __init__(self,l_freq=None, h_freq=None, sfreq=1.0, filter_length='auto', l_trans_bandwidth='auto', h_trans_bandwidth='auto', n_jobs=None, method='fir', iir_params=None, fir_window='hamming', fir_design='firwin', *, verbose=None):
+
+class MaskedTemporalFilter(TemporalFilter):
+    def __init__(
+        self,
+        l_freq=None,
+        h_freq=None,
+        sfreq=1.0,
+        filter_length="auto",
+        l_trans_bandwidth="auto",
+        h_trans_bandwidth="auto",
+        n_jobs=None,
+        method="fir",
+        iir_params=None,
+        fir_window="hamming",
+        fir_design="firwin",
+        *,
+        verbose=None
+    ):
         self.verbose = None
-        super().__init__(l_freq, h_freq, sfreq, filter_length, l_trans_bandwidth, h_trans_bandwidth, n_jobs, method, iir_params, fir_window, fir_design,verbose=None)       
+        super().__init__(
+            l_freq,
+            h_freq,
+            sfreq,
+            filter_length,
+            l_trans_bandwidth,
+            h_trans_bandwidth,
+            n_jobs,
+            method,
+            iir_params,
+            fir_window,
+            fir_design,
+            verbose=None,
+        )
+
     def transform(self, x: np.ma.core.MaskedArray) -> np.ma.core.MaskedArray:
         """Filter data along the last dimension and account for masking
 

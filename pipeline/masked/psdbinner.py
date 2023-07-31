@@ -2,9 +2,9 @@ import numpy as np
 
 from ..psdbinner import PSDBinner
 from typing import List, Tuple
-from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
 
-class MaskedPSDBinner(PSDBinner,BaseEstimator):
+
+class MaskedPSDBinner(PSDBinner):
     def transform(  # type: ignore
         self, x: np.ma.core.MaskedArray, *args, **kwargs  # type: ignore
     ) -> np.ndarray:  # type: ignore

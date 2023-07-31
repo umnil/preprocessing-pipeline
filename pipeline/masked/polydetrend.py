@@ -1,9 +1,9 @@
 import numpy as np
 from typing import List, Tuple
 from ..polydetrend import PolyDetrend
-from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
 
-class MaskedPolyDetrend(PolyDetrend,BaseEstimator):
+
+class MaskedPolyDetrend(PolyDetrend):
     def transform(  # type: ignore
         self, x: np.ma.core.MaskedArray, *args, **kwargs
     ) -> np.ma.core.MaskedArray:
