@@ -6,7 +6,7 @@ from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
 
 class MaskedPSDEstimator(PSDEstimator,BaseEstimator):
            # super().__init__()
-    def __init__(self,sfreq=None, fmin=None, fmax=None, bandwidth=None, adaptive=False, low_bias=True, n_jobs=4, normalization = None, *, verbose=None):
+    def __init__(self,sfreq=None, fmin=None, fmax=None, bandwidth=None, adaptive=False, low_bias=True, n_jobs=None, normalization = None, *, verbose=None):
         self.verbose = None
         super().__init__(sfreq, fmin, fmax, bandwidth, adaptive, low_bias, n_jobs, normalization, verbose=None)
     def transform(self, x: np.ma.core.MaskedArray, **kwargs) -> np.ma.core.MaskedArray:
