@@ -43,7 +43,7 @@ class PSDBinner(TransformerMixin, BaseEstimator):
         return x
 
     def _fn(self, x: np.ndarray, i: int) -> np.ndarray:
-        if type(self.fn) == str:
+        if isinstance(self.fn, str):
             return np.__dict__[self.fn](x)
         else:
             f: Callable = cast(Callable, self.fn)
