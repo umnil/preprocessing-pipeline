@@ -2,42 +2,17 @@ import mne  # type: ignore
 import numpy as np
 import pandas as pd  # type: ignore
 
+from ...mne import Labeler  # type: ignore
+from ..masker import list_to_masked  # type: ignore
 from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
 from typing import List, Optional, Union
 
 
-class Labeler(TransformerMixin, BaseEstimator):
+class MaskedLabeler(Labeler):
     """Input is an mne.Raw object and output is a numpy array in the shape of
     (sample, channels, time), time will have a length of one so that the
     Windowing object can perform the appropraite windowing
     """
-
-    def __init__(
-        self,
-        labels: Optional[List] = None,
-        channels: Optional[List] = None,
-        concatenate: bool = True,
-    ):
-        """Initialize a labeler that will search for the labels specified in
-        `labels`
-
-        Parameters
-        ----------
-        labels : Optional[List]
-            Labels
-        channels : Optional[List]
-            Channels to pick
-        concatenate : bool
-            When transform is passed a list of Raws, if `concatenate` is set to
-            `False`, the transform will return a 3 dimensional matrix
-        """
-        self.labels: Optional[List[str]] = labels
-        self.channels: Optional[List[int]] = channels
-        self.concatenate: bool = concatenate
-        self._x_hat: np.ndarray = np.empty([])
-        self._y_hat: np.ndarray = np.empty([])
-        self._x_lengths: List[int] = []
-        self._y_lengths: List[int] = []
 
     def fit(self, x: Union[mne.io.Raw, List[mne.io.Raw]], *args, **kwargs) -> "Labeler":
         """Fit the labeler to the raw data
@@ -54,10 +29,10 @@ class Labeler(TransformerMixin, BaseEstimator):
         """
         if isinstance(x, List):
             y_hat_list = [self.load_labels(i) for i in x]
-            self._y_hat = (
-                np.concatenate(y_hat_list) if self.concatenate else np.stack(y_hat_list)
-            )
+            self._y_hat = list_to_masked(y_hat_list)
             self._y_lengths = [i.shape[-1] for i in y_hat_list]
+            if self.concatenate:
+                self._y_hat = self._y_hat.reshape(-1, *self._y_hat.shape[-2:])
         else:
             self._y_hat = self.load_labels(x)
             self._y_lengths = [self._y_hat.shape[-1]]
@@ -125,10 +100,11 @@ class Labeler(TransformerMixin, BaseEstimator):
                 data = i.get_data()
                 data = np.moveaxis(np.expand_dims(data, -1), 0, 1)
                 data_list.append(data)
-            self._x_hat = (
-                np.concatenate(data_list) if self.concatenate else np.stack(data_list)
-            )
+
+            self._x_hat = list_to_masked(data_list)
             self._x_lengths = [i.shape[0] for i in data_list]
+            if self.concatenate:
+                self._x_hat = self._x_hat.reshape(-1, *self._x_hat.shape[-2:])
         else:
             x = x.copy() if self.channels is None else x.copy().pick(self.channels)
             data = x.get_data()
