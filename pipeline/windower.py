@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 
-from typing import List
+from typing import List, Union
 from collections import Counter
 from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
 
@@ -19,6 +19,7 @@ class Windower(TransformerMixin, BaseEstimator):
         label_scheme: int = 0,
         window_step: int = 80,
         trial_size: int = 60000,
+        axis: Union[int, List[int]] = 0,
     ):
         """
 
@@ -49,22 +50,19 @@ class Windower(TransformerMixin, BaseEstimator):
             divided prior to windowing. This is the number of packets expected
             per trial
             Ignored if `label_scheme == 4`
+        axis : Union[int, List[int]]
+            The dimension across which to perform windowing. If a list of axes
+            is provided, this transformer functions as a re-windowing function,
+            in which the axes in the list are remerged and windowed over.
         """
         self.samples_per_window: int = samples_per_window
-        # self.window_size: int = window_size
         self.window_step: int = window_step
         self.trial_size: int = trial_size
-        # self.packet_channel_sizes = packet_channel_sizes
-        # self.packet_size: int = sum(packet_channel_sizes)
         self.label_scheme: int = label_scheme
-        # self._window_packet_size: int = self.window_size * self.packet_size
-        # self._window_channel_size: List[int] = [
-        # self.window_size * x for x in self.packet_channel_sizes
-        # ]
         self._window_packets: np.ndarray = np.array([])
-        self._n_packets: int = 0
+        self.axis: Union[int, List[int]]
 
-        # Uninitialized variables to be defined alter
+        # Uninitialized variables to be defined later
         self._n_windows: int
         self._t: int
         self._y_hat: np.ndarray
@@ -158,19 +156,18 @@ class Windower(TransformerMixin, BaseEstimator):
         Parameters
         ----------
         y : np.ndarray
-            An Nx1 input array of the labels to be transformed
+            An multidimensional input array of the labels to be transformed
 
         Returns
         -------
         np.ndarray
             an Wx1 input array were W is the number of windows
         """
-        # extrapolate labels for each sample
-        y = np.array(y.tolist() * self._t).reshape(self._t, -1).T
-        y = y.flatten()
-
-        self._n = y.shape[-1]
-        n_steps = int(self._n / self.window_step)
+        # Move our time axis to the back
+        t_axis: int = self.axis if isinstance(self.axis, int) else self.axis[0]
+        _y: np.ndarray = np.moveaxis(y, t_axis, -1)
+        self._n: int = _y.shape[-1]
+        n_steps: int = int(self._n / self.window_step)
 
         window_start_idxs: np.ndarray = np.linspace(0, self._n, n_steps + 1).astype(
             np.int32
@@ -182,16 +179,28 @@ class Windower(TransformerMixin, BaseEstimator):
             [idxs for idxs in window_idxs if ~np.any(idxs > self._n)]
         )
         self._window_idxs = window_idxs
-        y = np.array([y[i] for i in window_idxs])
+        y = np.stack([_y[..., i] for i in window_idxs])
 
+        # replace time axis. Shape should now be (... n_windows, n_time)
+        y = np.moveaxis(y, 0, t_axis)
+
+        # Apply scheme
         if self.label_scheme == 0:
             # Only use the first packet label
-            y_transformed = y[:, 0]
+            y_transformed = y[..., 0]
         elif self.label_scheme == 1:
             # Only use the last packet label
-            y_transformed = y[:-1]
+            y_transformed = y[..., -1]
         elif self.label_scheme == 2:
             # Most common label
+            # = np.moveaxis(y, 0, ya)
+            flattened_y: np.ndarray = y.reshape(-1, self.samples_per_window)
+            fy = [i.data[~i.mask] for i in fy]
+
+            counts = [np.unique(i, return_counts=True) for i in fy]
+            np.stack([i[0][np.argmax(i[1])] for i in counts]).reshape(
+                *y_windowed.shape[:-1]
+            ).shape
             y_transformed = np.array([Counter(x).most_common()[0][0] for x in y])
         elif self.label_scheme == 3:
             # Non-ambiguous

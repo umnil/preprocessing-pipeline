@@ -32,7 +32,7 @@ class MaskedLabeler(Labeler):
             self._y_hat = list_to_masked(y_hat_list)
             self._y_lengths = [i.shape[-1] for i in y_hat_list]
             if self.concatenate:
-                self._y_hat = self._y_hat.reshape(-1, *self._y_hat.shape[-2:])
+                self._y_hat = self._y_hat.flatten()
         else:
             self._y_hat = self.load_labels(x)
             self._y_lengths = [self._y_hat.shape[-1]]
