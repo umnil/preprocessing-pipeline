@@ -60,7 +60,7 @@ class Windower(TransformerMixin, BaseEstimator):
         self.trial_size: int = trial_size
         self.label_scheme: int = label_scheme
         self._window_packets: np.ndarray = np.array([])
-        self.axis: Union[int, List[int]]
+        self.axis: Union[int, List[int]] = axis
 
         # Uninitialized variables to be defined later
         self._n_windows: int
@@ -88,17 +88,17 @@ class Windower(TransformerMixin, BaseEstimator):
         Windower
             The current instance of the windowing object
         """
-        self._t = X.shape[-1]
+        self._t = np.prod(np.array(x.shape)[self.axis])
         self._y = y
         self._y_hat = self._make_labels(y)
         return self
 
-    def transform(self, X: np.ndarray) -> np.ndarray:
+    def transform(self, x: np.ndarray) -> np.ndarray:
         """Transforms the dataframe of packets into a dataframe of windows
 
         Parameters
         ----------
-        X : np.ndarray
+        x : np.ndarray
             see `fit()`
 
         Returns
@@ -107,7 +107,6 @@ class Windower(TransformerMixin, BaseEstimator):
             WxD matrix where W is the number of windows and `D = packet_size *
             window_size`
         """
-        x = X
         # place channels up front to preserve their order and flatten
         # everything else
         x = np.swapaxes((x), 0, 1)
@@ -193,30 +192,29 @@ class Windower(TransformerMixin, BaseEstimator):
             y_transformed = y[..., -1]
         elif self.label_scheme == 2:
             # Most common label
-            # = np.moveaxis(y, 0, ya)
             flattened_y: np.ndarray = y.reshape(-1, self.samples_per_window)
-            fy = [i.data[~i.mask] for i in fy]
 
-            counts = [np.unique(i, return_counts=True) for i in fy]
-            np.stack([i[0][np.argmax(i[1])] for i in counts]).reshape(
-                *y_windowed.shape[:-1]
-            ).shape
-            y_transformed = np.array([Counter(x).most_common()[0][0] for x in y])
+            counts: List = [np.unique(i, return_counts=True) for i in flattened_y]
+            y_transformed = (
+                np.stack([i[0][np.argmax(i[1])] for i in counts])
+                .reshape(*y_windowed.shape[:-1])
+                .shape
+            )
         elif self.label_scheme == 3:
             # Non-ambiguous
             y_transformed = np.array([np.nan if len(set(x)) > 1 else x[0] for x in y])
         elif self.label_scheme == 4:
             # Windows by labels
             y = self._y
-            delta_y = np.array([b - a for a, b in zip(y[:-1], y[1:])])
-            trans_y = np.where(delta_y != 0)[0] + 1
-            delta_idxs = np.array([0] + trans_y.tolist() + [y.size])
-            window_list_idxs = [
+            delta_y: np.ndarray = np.array([b - a for a, b in zip(y[:-1], y[1:])])
+            trans_y: np.ndarray = np.where(delta_y != 0)[0] + 1
+            delta_idxs: np.ndarray = np.array([0] + trans_y.tolist() + [y.size])
+            window_list_idxs: List = [
                 list(range(a, b)) for a, b in zip(delta_idxs[:-1], delta_idxs[1:])
             ]
-            window_lengths = [len(i) for i in window_list_idxs]
-            max_win_len = max(window_lengths)
-            list_y = [y[i] for i in window_list_idxs]
+            window_lengths: List[int] = [len(i) for i in window_list_idxs]
+            max_win_len: int = max(window_lengths)
+            list_y: List[int] = [y[i] for i in window_list_idxs]
             y = np.array(
                 [i.tolist() + [np.nan] * (max_win_len - i.size) for i in list_y]
             )
