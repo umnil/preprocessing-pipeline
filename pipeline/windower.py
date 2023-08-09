@@ -1,9 +1,9 @@
 import logging
 import numpy as np
 
-from typing import List, Union
-from collections import Counter
+from typing import List, Tuple, Union
 from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
+from . import utils
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -63,11 +63,132 @@ class Windower(TransformerMixin, BaseEstimator):
         self.axis: Union[int, List[int]] = axis
 
         # Uninitialized variables to be defined later
+        self._n: int
         self._n_windows: int
         self._t: int
         self._y_hat: np.ndarray
         self._y: np.ndarray
         self._X: np.ndarray
+
+    def _make_labels(self, y: np.ndarray) -> np.ndarray:
+        """Generate new labels for each window
+
+        Parameters
+        ----------
+        y : np.ndarray
+            An multidimensional input array of the labels to be transformed
+
+        Returns
+        -------
+        np.ndarray
+            an Wx1 input array were W is the number of windows
+        """
+        t_axis: int = self.axis if isinstance(self.axis, int) else self.axis[0]
+        self._n = y.shape[t_axis]
+        y, win_idxs = self._window_transform(y, t_axis, True)
+        self._window_idxs = win_idxs
+
+        # Apply labelling scheme
+        if self.label_scheme == 0:
+            # Only use the first packet label
+            y_transformed = y[..., 0]
+        elif self.label_scheme == 1:
+            # Only use the last packet label
+            y_transformed = y[..., -1]
+        elif self.label_scheme == 2:
+            # Most common label
+            flattened_y: np.ndarray = y.reshape(-1, self.samples_per_window)
+            counts: List = [np.unique(i, return_counts=True) for i in flattened_y]
+            flattened_y = np.stack([i[0][np.argmax(i[1])] for i in counts])
+            y = flattened_y.reshape(*y.shape[:-1])
+            y_transformed = y.squeeze()
+        elif self.label_scheme == 3:
+            # Non-ambiguous
+            y_transformed = np.array([np.nan if len(set(x)) > 1 else x[0] for x in y])
+        elif self.label_scheme == 4:
+            # Windows by labels
+            y = self._y
+            if y.ndim > 1:
+                y = utils.equalize_list_to_array([self._window_by_label(i) for i in y])
+            else:
+                y = self._window_by_label(y)
+            y_transformed = y
+
+        self._n_windows = y_transformed.shape[0]
+        return y_transformed
+
+    def _window_by_label(self, labels: np.ndarray) -> np.ndarray:
+        """Create windows over labels such that each window is a unique set of
+        values within labels. The order of the windows are as the values appear
+        in labels. Labels is expected to be one dimensional
+
+        Parameters
+        ----------
+        labels : np.ndarray
+            The labels to window
+
+        Return
+        ------
+        np.ndarray
+            The 2d windowed array
+        """
+        assert (
+            labels.ndim == 1
+        ), "Windowing by label requiers that the labels are 1 dimensional"
+        delta: np.ndarray = np.diff(labels)
+        transitions: np.ndarray = np.where(delta != 0)[-1] + 1
+        delta_idxs: np.ndarray = np.array([0] + transitions.tolist() + [labels.size])
+        window_list_idxs: List = [
+            np.arange(a, b) for a, b in zip(delta_idxs[:-1], delta_idxs[1:])
+        ]
+        labels_list: List = [labels[i] for i in window_list_idxs]
+        labels = utils.equalize_list_to_array(labels_list)
+        return labels[:, 0]
+
+    def _window_transform(
+        self, a: np.ndarray, axis: int = 0, return_indices: bool = False
+    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """Performs a windowing transformation on an array across the given
+        axis
+
+        Parameters
+        ----------
+        a : np.ndarray
+            The input array to perform the windowing on
+        axis : int
+            The axis within `a` across which to perform windowing
+        return_indices : bool
+            If true, returns the indcies used to index the windows from the
+            original input array
+
+        Returns
+        -------
+        np.ndarray
+            The windowed array
+        """
+        # Move working axis to the back
+        a = np.moveaxis(a, axis, -1)
+
+        # calculate the number of windows
+        n_win: int = int(self._n / self.window_step)
+        window_start_idxs = np.linspace(0, self._n, n_win + 1).astype(np.int32)
+        window_idxs = np.array(
+            [np.arange(s, s + self.samples_per_window) for s in window_start_idxs]
+        )
+        window_idxs = np.array(
+            [idxs for idxs in window_idxs if ~np.any(idxs > self._n)]
+        )
+        a = np.stack([a[..., i] for i in window_idxs])
+        # shape should now be (n_win, ..., n_time)
+        # where n_time = samples_per_window
+        assert (
+            a.shape[0] == n_win - 1
+        ), f"Failed to window the data. Expected {n_win-1}, but got {a.shape[0]}"
+        assert a.shape[-1] == self.samples_per_window
+
+        # replace time axis. Shape should now be (... n_windows, ..., n_time)
+        a = np.moveaxis(a, 0, axis)
+        return a if not return_indices else a, window_idxs
 
     def fit(self, x: np.ndarray, y: np.ndarray, **fit_params) -> "Windower":
         """Uses the data given to determine appropriate window indicies and
@@ -157,81 +278,6 @@ class Windower(TransformerMixin, BaseEstimator):
         self._X = x
 
         return self._X
-
-    def _make_labels(self, y: np.ndarray) -> np.ndarray:
-        """Generate new labels for each window
-
-        Parameters
-        ----------
-        y : np.ndarray
-            An multidimensional input array of the labels to be transformed
-
-        Returns
-        -------
-        np.ndarray
-            an Wx1 input array were W is the number of windows
-        """
-        # Move our time axis to the back
-        t_axis: int = self.axis if isinstance(self.axis, int) else self.axis[0]
-        _y: np.ndarray = np.moveaxis(y, t_axis, -1)
-        self._n: int = _y.shape[-1]
-        n_steps: int = int(self._n / self.window_step)
-
-        window_start_idxs: np.ndarray = np.linspace(0, self._n, n_steps + 1).astype(
-            np.int32
-        )
-        window_idxs: np.ndarray = np.array(
-            [np.arange(s, s + self.samples_per_window) for s in window_start_idxs]
-        )
-        window_idxs = np.array(
-            [idxs for idxs in window_idxs if ~np.any(idxs > self._n)]
-        )
-        self._window_idxs = window_idxs
-        y = np.stack([_y[..., i] for i in window_idxs])
-
-        # replace time axis. Shape should now be (... n_windows, n_time)
-        y = np.moveaxis(y, 0, t_axis)
-
-        # Apply scheme
-        if self.label_scheme == 0:
-            # Only use the first packet label
-            y_transformed = y[..., 0]
-        elif self.label_scheme == 1:
-            # Only use the last packet label
-            y_transformed = y[..., -1]
-        elif self.label_scheme == 2:
-            # Most common label
-            flattened_y: np.ndarray = y.reshape(-1, self.samples_per_window)
-
-            counts: List = [np.unique(i, return_counts=True) for i in flattened_y]
-            y_transformed = (
-                np.stack([i[0][np.argmax(i[1])] for i in counts])
-                .reshape(*y_windowed.shape[:-1])
-                .shape
-            )
-        elif self.label_scheme == 3:
-            # Non-ambiguous
-            y_transformed = np.array([np.nan if len(set(x)) > 1 else x[0] for x in y])
-        elif self.label_scheme == 4:
-            # Windows by labels
-            y = self._y
-            delta_y: np.ndarray = np.array([b - a for a, b in zip(y[:-1], y[1:])])
-            trans_y: np.ndarray = np.where(delta_y != 0)[0] + 1
-            delta_idxs: np.ndarray = np.array([0] + trans_y.tolist() + [y.size])
-            window_list_idxs: List = [
-                list(range(a, b)) for a, b in zip(delta_idxs[:-1], delta_idxs[1:])
-            ]
-            window_lengths: List[int] = [len(i) for i in window_list_idxs]
-            max_win_len: int = max(window_lengths)
-            list_y: List[int] = [y[i] for i in window_list_idxs]
-            y = np.array(
-                [i.tolist() + [np.nan] * (max_win_len - i.size) for i in list_y]
-            )
-            y = y[:, 0]
-            y_transformed = y
-
-        self._n_windows = y_transformed.shape[0]
-        return y_transformed
 
     def _get_channel_packets(self, X: np.ndarray, channel: int) -> np.ndarray:
         """Extracts the packeted data array from the input matrix.
