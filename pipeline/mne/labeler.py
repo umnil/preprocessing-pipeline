@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd  # type: ignore
 
 from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 
 class Labeler(TransformerMixin, BaseEstimator):
@@ -24,7 +24,7 @@ class Labeler(TransformerMixin, BaseEstimator):
         Parameters
         ----------
         labels : Optional[List]
-            Labels
+            Labels. If unlabeled sections should be included, be sure to add `None` to the list
         channels : Optional[List]
             Channels to pick
         concatenate : bool
@@ -53,18 +53,22 @@ class Labeler(TransformerMixin, BaseEstimator):
             self
         """
         if isinstance(x, List):
-            y_hat_list = [self.load_labels(i) for i in x]
-            self._y_hat = (
-                np.concatenate(y_hat_list) if self.concatenate else np.stack(y_hat_list)
-            )
+            y_hat_list: List = [self.load_labels(i) for i in x]
             self._y_lengths = [i.shape[-1] for i in y_hat_list]
+            if not self.concatenate:
+                self._y_hat = self.equalize_list_to_array(y_hat_list)
+            else:
+                self._y_hat = np.concatenate(y_hat_list)
         else:
             self._y_hat = self.load_labels(x)
             self._y_lengths = [self._y_hat.shape[-1]]
         return self
 
     def load_labels(self, raw: mne.io.Raw) -> np.ndarray:
-        """Load the labels from an individual raw object
+        """Load the labels from an individual raw object. If the `Labeler` was
+        initialized with a set of labels, the labels are replaced with the
+        index value of the label as they are provided. The result is always a
+        list of integers. Values not found in the labels are marked as NaN.
 
         Parameters
         ----------
@@ -96,12 +100,19 @@ class Labeler(TransformerMixin, BaseEstimator):
 
         retval: np.ndarray
         if self.labels is not None:
-            retval = pd.Categorical(y_labels, self.labels).codes
+            labels = self.labels
+            if None in self.labels:
+                labels = [label for label in self.labels if label is not None]
+            retval = pd.Categorical(y_labels, labels).codes
+            retval = retval.astype(np.float64)
+            if None not in self.labels:
+                # We make time points that will be removed as NaN
+                retval[retval == -1.0] = retval[retval == -1.0] * np.nan
         else:
             retval = np.unique(y_labels, return_inverse=True)[1]
+            retval = retval.astype(np.float64)
 
         retval = retval.astype(np.float64)
-        retval[retval == -1] = np.nan
         return retval
 
     def transform(self, x: Union[mne.io.Raw, List[mne.io.Raw]]) -> np.ndarray:
@@ -125,12 +136,98 @@ class Labeler(TransformerMixin, BaseEstimator):
                 data = i.get_data()
                 data = np.moveaxis(np.expand_dims(data, -1), 0, 1)
                 data_list.append(data)
-            self._x_hat = (
-                np.concatenate(data_list) if self.concatenate else np.stack(data_list)
-            )
+            if not self.concatenate:
+                self._x_hat = self.equalize_list_to_array(data_list)
+                self._x_hat = self.equalize_list_to_array(
+                    [i[~np.isnan(j)] for i, j in zip(self._x_hat, self._y_hat)]
+                )
+                self._y_hat = self.equalize_list_to_array(
+                    [i[~np.isnan(i)] for i in self._y_hat]
+                )
+            else:
+                self._x_hat = np.concatenate(data_list)
             self._x_lengths = [i.shape[0] for i in data_list]
         else:
             x = x.copy() if self.channels is None else x.copy().pick(self.channels)
             data = x.get_data()
             self._x_hat = np.moveaxis(np.expand_dims(data, -1), 0, 1)
+            self._x_hat = self._x_hat[~np.isnan(self._y_hat)]
+            self._y_hat = self._y_hat[~np.isnan(self._y_hat)]
+
+        # Remove NaN marked data
         return self._x_hat
+
+    def equalize_shape(self, a: np.ndarray, axis: int = 0) -> np.ndarray:
+        """This is a convenience function for ensuring that each element along
+        a given axis of `a` is sized to the amount equal to the element with
+        the largest size. NaN's are used as placeholders. Since this function
+        can be called more than once, Nan's are first stripped if they exist.
+
+        Parameters
+        ----------
+        a : np.ndarray
+            The multidimensional input array
+
+        axis : int
+            The axis along which to modify & equalize
+
+        Return
+        ------
+        np.ndarray
+        """
+        a = np.moveaxis(a, axis, -1)
+
+        cur_len: int = a.shape[-1]
+        preserved_sizes: Tuple = a.shape[:-1]
+        a = a.reshape(-1, cur_len)
+
+        list_a: List = [i[~np.isnan(i)] for i in a]
+        a = self.equalize_list_to_array(list_a, axis)
+
+        a = a.reshape(*preserved_sizes, -1)
+        a = np.moveaxis(a, -1, axis)
+        return a
+
+    def equalize_list_to_array(self, a: List[np.ndarray], axis: int = 0) -> np.ndarray:
+        """Given a list of ragged numpy arrays, this function fills the missing
+        data with NaN to return an array with squre dimensions
+
+        Parameters
+        ----------
+        a : List
+            The list of other numpy arrays
+        axis : int
+            The axis within the arrays along which NaNs are filled
+
+        Return
+        ------
+        np.ndarray
+            The filled and stacked array
+        """
+        max_len: int = max([i.shape[axis] for i in a])
+        a = [
+            np.pad(
+                i,
+                self.generate_padding_param(i, max_len, axis),
+                "constant",
+                constant_values=np.nan,
+            )
+            for i in a
+        ]
+        return np.stack(a)
+
+    def generate_padding_param(
+        self, a: np.ndarray, max_len: int, axis: int = 0
+    ) -> List:
+        """Create a set of tuples for use in np.pad
+
+        Parameters
+        ----------
+        a : np.ndarray
+            The array to check the shape of
+        max_len : int
+            Maximum expected length
+        axis : int
+            The axis along which to create padding
+        """
+        return [[0, max_len - a.shape[axis] if i == axis else 0] for i in range(a.ndim)]

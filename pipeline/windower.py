@@ -69,7 +69,7 @@ class Windower(TransformerMixin, BaseEstimator):
         self._y: np.ndarray
         self._X: np.ndarray
 
-    def fit(self, X: np.ndarray, y: np.ndarray, **fit_params) -> "Windower":
+    def fit(self, x: np.ndarray, y: np.ndarray, **fit_params) -> "Windower":
         """Uses the data given to determine appropriate window indicies and
         labelling. When running, transform is expected to be passed the same X
         array, otherwise the behavior is undefined
@@ -107,26 +107,35 @@ class Windower(TransformerMixin, BaseEstimator):
             WxD matrix where W is the number of windows and `D = packet_size *
             window_size`
         """
-        # place channels up front to preserve their order and flatten
-        # everything else
-        x = np.swapaxes((x), 0, 1)
-        n_channels = x.shape[0]
-        x = x.reshape(n_channels, -1)
+        # place all time axes in the back and all other axes up front
+        # Flatten the back so that time is linear across all other axes
+        axis_restore: np.ndarray = np.arange(x.ndim)
+        if isinstance(self.axis, int):
+            x = np.moveaxis(x, self.axis, -1)
+            x = x.reshape(*x.shape[:-1], -1)
+            axis_restore[[-1, self.axis]] = axis_restore[[self.axis, -1]]
+        elif isinstance(self.axis, list):
+            x = np.moveaxis(x, self.axis, range(-len(self.axis), 0))
+            x = x.reshape(*x.shape[: -len(self.axis)], -1)
+            axis_restore[[np.arange(-len(self.axis), 0), self.axis]] = axis_restore[
+                [self.axis, np.arange(-len(self.axis), 0)]
+            ]
 
-        full_t = x.shape[-1]
-        n_windows = int(full_t / self.window_step)
-        window_start_idxs = np.linspace(0, full_t, n_windows + 1).astype(np.int32)
-        window_idxs = np.array(
+        full_t: int = x.shape[-1]
+        n_windows: int = int(full_t / self.window_step)
+        window_start_idxs: np.ndarray = np.linspace(0, full_t, n_windows + 1).astype(
+            np.int32
+        )
+        window_idxs: np.ndarray = np.array(
             [np.arange(s, s + self.samples_per_window) for s in window_start_idxs]
         )
         window_idxs = np.array([idxs for idxs in window_idxs if ~np.any(idxs > full_t)])
 
-        x = np.swapaxes(x, 0, 1)
         if self.label_scheme != 4:
-            x = np.array([x[i] for i in window_idxs])
-            x = np.swapaxes(x, -1, -2)
+            x = x[..., window_idxs]
+            x = np.moveaxis(x, axis_restore, np.arange(axis_restore.size))
         else:
-            y = self._y
+            y: np.array = self._y
             y = np.array(y.tolist() * self._t).reshape(self._t, -1).T
             y = y.flatten()
             yd = np.array([b - a for a, b in zip(y[1:], y[:-1])])
