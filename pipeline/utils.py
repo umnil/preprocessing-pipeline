@@ -75,4 +75,5 @@ def generate_padding_param(a: np.ndarray, max_len: int, axis: int = 0) -> List:
     axis : int
         The axis along which to create padding
     """
+    axis = axis if axis >= 0 else (a.ndim - axis)
     return [[0, max_len - a.shape[axis] if i == axis else 0] for i in range(a.ndim)]
