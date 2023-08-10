@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd  # type: ignore
 
 from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 from .. import utils
 
@@ -26,7 +26,8 @@ class Labeler(TransformerMixin, BaseEstimator):
         Parameters
         ----------
         labels : Optional[List]
-            Labels. If unlabeled sections should be included, be sure to add `None` to the list
+            Labels. If unlabeled sections should be included, be sure to add
+            `None` to the list.
         channels : Optional[List]
             Channels to pick
         concatenate : bool
@@ -40,6 +41,47 @@ class Labeler(TransformerMixin, BaseEstimator):
         self._y_hat: np.ndarray = np.empty([])
         self._x_lengths: List[int] = []
         self._y_lengths: List[int] = []
+        self._mask: np.ndarray = np.empty([])
+
+    def filter_labels(self, y_labels: List[str]) -> np.ndarray:
+        """Given a list of string labels obtained from mne annotations convert
+        these to numerical labels depending on whether they're provided to the
+        labeler class. The result is always a list of integers. Data where
+        labels are not requested will be removed.
+
+        Parameters
+        ----------
+        y_labels : List[str]
+            A list of labels. Each label corresponds to exactly one sampled
+            data point
+
+        Returns
+        -------
+        np.ndarray
+        """
+        cur_mask: np.ndarray = np.array([True] * len(y_labels))
+        retval: np.ndarray
+        if self.labels is not None:
+            labels = self.labels
+            if None in self.labels:
+                labels = [
+                    label if label is not None else "None" for label in self.labels
+                ]
+            # Data points with no label are marked as -1
+            retval = pd.Categorical(y_labels, labels).codes
+            # We make time points that will be removed as NaN
+            cur_mask = retval != -1.0
+            retval = retval[cur_mask]
+        else:
+            retval = np.unique(y_labels, return_inverse=True)[1]
+
+        self._mask = (
+            cur_mask[None, ...]
+            if self._mask.size < 2
+            else np.r_[self._mask, cur_mask[None, ...]]
+        )
+        retval = retval.astype(np.float64)
+        return retval
 
     def fit(self, x: Union[mne.io.Raw, List[mne.io.Raw]], *args, **kwargs) -> "Labeler":
         """Fit the labeler to the raw data
@@ -55,22 +97,22 @@ class Labeler(TransformerMixin, BaseEstimator):
             self
         """
         if isinstance(x, List):
-            y_hat_list: List = [self.load_labels(i) for i in x]
+            y_hat_list: List = [self.filter_labels(self.load_labels(i)) for i in x]
             self._y_lengths = [i.shape[-1] for i in y_hat_list]
             if not self.concatenate:
                 self._y_hat = utils.equalize_list_to_array(y_hat_list)
             else:
                 self._y_hat = np.concatenate(y_hat_list)
         else:
-            self._y_hat = self.load_labels(x)
+            self._y_hat = self.filter_labels(self.load_labels(x))
             self._y_lengths = [self._y_hat.shape[-1]]
         return self
 
-    def load_labels(self, raw: mne.io.Raw) -> np.ndarray:
+    @staticmethod
+    def load_labels(raw: mne.io.Raw) -> List[str]:
         """Load the labels from an individual raw object. If the `Labeler` was
         initialized with a set of labels, the labels are replaced with the
-        index value of the label as they are provided. The result is always a
-        list of integers. Values not found in the labels are marked as NaN.
+        index value of the label as they are provided.
 
         Parameters
         ----------
@@ -79,8 +121,8 @@ class Labeler(TransformerMixin, BaseEstimator):
 
         Returns
         -------
-        np.ndarray
-            A list of labels for each data point
+        List[str]
+            A list of labels
         """
         sfreq: int = raw.info["sfreq"]
         data: np.ndarray = raw.get_data()
@@ -100,22 +142,7 @@ class Labeler(TransformerMixin, BaseEstimator):
             label_seg: List[str] = [description] * n_label_samples
             y_labels[begin:end] = label_seg
 
-        retval: np.ndarray
-        if self.labels is not None:
-            labels = self.labels
-            if None in self.labels:
-                labels = [label for label in self.labels if label is not None]
-            retval = pd.Categorical(y_labels, labels).codes
-            retval = retval.astype(np.float64)
-            if None not in self.labels:
-                # We make time points that will be removed as NaN
-                retval[retval == -1.0] = retval[retval == -1.0] * np.nan
-        else:
-            retval = np.unique(y_labels, return_inverse=True)[1]
-            retval = retval.astype(np.float64)
-
-        retval = retval.astype(np.float64)
-        return retval
+        return y_labels
 
     def transform(self, x: Union[mne.io.Raw, List[mne.io.Raw]]) -> np.ndarray:
         """Transform an mne.Raw object into individual data and labels
@@ -140,21 +167,22 @@ class Labeler(TransformerMixin, BaseEstimator):
                 data_list.append(data)
             if not self.concatenate:
                 self._x_hat = utils.equalize_list_to_array(data_list)
-                self._x_hat = utils.equalize_list_to_array(
-                    [i[~np.isnan(j)] for i, j in zip(self._x_hat, self._y_hat)]
-                )
-                self._y_hat = utils.equalize_list_to_array(
-                    [i[~np.isnan(i)] for i in self._y_hat]
-                )
+                original_shape: Tuple = self._x_hat.shape
+                end_shape: Tuple = original_shape[2:]
+                n: int = original_shape[0]
+                self._x_hat = self._x_hat.reshape(-1, *end_shape)
+                self._x_hat = self._x_hat[self._mask.flatten()]
+                self._x_hat = self._x_hat.reshape(n, -1, *end_shape)
             else:
                 self._x_hat = np.concatenate(data_list)
+                self._x_hat = self._x_hat[self._mask.flatten()]
             self._x_lengths = [i.shape[0] for i in data_list]
         else:
             x = x.copy() if self.channels is None else x.copy().pick(self.channels)
             data = x.get_data()
-            self._x_hat = np.moveaxis(np.expand_dims(data, -1), 0, 1)
-            self._x_hat = self._x_hat[~np.isnan(self._y_hat)]
-            self._y_hat = self._y_hat[~np.isnan(self._y_hat)]
+            self._x_hat = np.moveaxis(  # size = (time, channels, 1)
+                np.expand_dims(data, -1), 0, 1
+            )
+            self._x_hat = self._x_hat[self._mask.flatten()]
 
-        # Remove NaN marked data
         return self._x_hat
