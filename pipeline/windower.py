@@ -117,7 +117,9 @@ class Windower(TransformerMixin, BaseEstimator):
         self._n_windows = y_transformed.shape[0]
         return y_transformed
 
-    def _window_by_label(self, labels: np.ndarray) -> np.ndarray:
+    def _window_by_label(
+        self, labels: np.ndarray, return_indices: bool = False
+    ) -> Union[np.ndarray, Tuple[np.ndarray, List]]:
         """Create windows over labels such that each window is a unique set of
         values within labels. The order of the windows are as the values appear
         in labels. Labels is expected to be one dimensional
@@ -126,27 +128,32 @@ class Windower(TransformerMixin, BaseEstimator):
         ----------
         labels : np.ndarray
             The labels to window
+        return_indices : bool
+            If True, return the windowing indices that can be used to rewindow
+            the original data
 
         Return
         ------
         np.ndarray
             The 2d windowed array
+        List
+            A list of windowing indices. Only returned if `return_indices` is true
         """
         assert (
             labels.ndim == 1
         ), "Windowing by label requiers that the labels are 1 dimensional"
         delta: np.ndarray = np.diff(labels)
-        transitions: np.ndarray = np.where(delta != 0)[-1] + 1
+        transitions: np.ndarray = np.where((delta != 0) * (~np.isnan(delta)))[-1] + 1
         delta_idxs: np.ndarray = np.array([0] + transitions.tolist() + [labels.size])
         window_list_idxs: List = [
             np.arange(a, b) for a, b in zip(delta_idxs[:-1], delta_idxs[1:])
         ]
         labels_list: List = [labels[i] for i in window_list_idxs]
         labels = utils.equalize_list_to_array(labels_list)
-        return labels[:, 0]
+        return labels[:, 0] if not return_indices else (labels[:, 0], window_list_idxs)
 
     def _window_transform(
-        self, a: np.ndarray, axis: int = 0, return_indices: bool = False
+        self, a: np.ndarray, axis: int = -1, return_indices: bool = False
     ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         """Performs a windowing transformation on an array across the given
         axis
@@ -170,14 +177,13 @@ class Windower(TransformerMixin, BaseEstimator):
         a = np.moveaxis(a, axis, -1)
 
         # calculate the number of windows
-        n_win: int = int(self._n / self.window_step)
-        window_start_idxs = np.linspace(0, self._n, n_win + 1).astype(np.int32)
+        t: int = a.shape[-1]
+        n_win: int = int(t / self.window_step)
+        window_start_idxs = np.linspace(0, t, n_win + 1).astype(np.int32)
         window_idxs = np.array(
             [np.arange(s, s + self.samples_per_window) for s in window_start_idxs]
         )
-        window_idxs = np.array(
-            [idxs for idxs in window_idxs if ~np.any(idxs > self._n)]
-        )
+        window_idxs = np.array([idxs for idxs in window_idxs if ~np.any(idxs > t)])
         a = np.stack([a[..., i] for i in window_idxs])
         # shape should now be (n_win, ..., n_time)
         # where n_time = samples_per_window
@@ -187,8 +193,8 @@ class Windower(TransformerMixin, BaseEstimator):
         assert a.shape[-1] == self.samples_per_window
 
         # replace time axis. Shape should now be (... n_windows, ..., n_time)
-        a = np.moveaxis(a, 0, axis)
-        return a if not return_indices else a, window_idxs
+        a = np.moveaxis(a, 0, axis - 1)
+        return a if not return_indices else (a, window_idxs)
 
     def fit(self, x: np.ndarray, y: np.ndarray, **fit_params) -> "Windower":
         """Uses the data given to determine appropriate window indicies and
@@ -242,19 +248,9 @@ class Windower(TransformerMixin, BaseEstimator):
                 [self.axis, np.arange(-len(self.axis), 0)]
             ]
 
-        full_t: int = x.shape[-1]
-        n_windows: int = int(full_t / self.window_step)
-        window_start_idxs: np.ndarray = np.linspace(0, full_t, n_windows + 1).astype(
-            np.int32
-        )
-        window_idxs: np.ndarray = np.array(
-            [np.arange(s, s + self.samples_per_window) for s in window_start_idxs]
-        )
-        window_idxs = np.array([idxs for idxs in window_idxs if ~np.any(idxs > full_t)])
-
         if self.label_scheme != 4:
-            x = x[..., window_idxs]
-            x = np.moveaxis(x, axis_restore, np.arange(axis_restore.size))
+            x = w._window_transform(x)
+            x = np.moveaxis(x, dim_list, np.arange(dim_list.size))
         else:
             y: np.array = self._y
             y = np.array(y.tolist() * self._t).reshape(self._t, -1).T
