@@ -31,7 +31,7 @@ def equalize_list_to_array(a: List[np.ndarray], axis: int = 0) -> np.ndarray:
     return np.stack(a)
 
 
-def equalize_shape(a: np.ndarray, axis: int = 0) -> np.ndarray:
+def equalize_shape(a: np.ndarray, axis: int = -1) -> np.ndarray:
     """This is a convenience function for ensuring that each element along
     a given axis of `a` is sized to the amount equal to the element with
     the largest size. NaN's are used as placeholders. Since this function
@@ -75,5 +75,5 @@ def generate_padding_param(a: np.ndarray, max_len: int, axis: int = 0) -> List:
     axis : int
         The axis along which to create padding
     """
-    axis = axis if axis >= 0 else (a.ndim - axis)
+    axis = axis if axis >= 0 else (a.ndim + axis)
     return [[0, max_len - a.shape[axis] if i == axis else 0] for i in range(a.ndim)]
