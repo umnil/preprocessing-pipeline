@@ -2,7 +2,7 @@ import numpy as np
 from typing import List, Tuple
 
 
-def equalize_list_to_array(a: List[np.ndarray], axis: int = 0) -> np.ndarray:
+def equalize_list_to_array(a: List[np.ndarray], axis: int = -1) -> np.ndarray:
     """Given a list of ragged numpy arrays, this function fills the missing
     data with NaN to return an array with squre dimensions
 
@@ -56,14 +56,14 @@ def equalize_shape(a: np.ndarray, axis: int = -1) -> np.ndarray:
     a = a.reshape(-1, cur_len)
 
     list_a: List = [i[~np.isnan(i)] for i in a]
-    a = equalize_list_to_array(list_a, axis)
+    a = equalize_list_to_array(list_a)
 
     a = a.reshape(*preserved_sizes, -1)
     a = np.moveaxis(a, -1, axis)
     return a
 
 
-def generate_padding_param(a: np.ndarray, max_len: int, axis: int = 0) -> List:
+def generate_padding_param(a: np.ndarray, max_len: int, axis: int = -1) -> List:
     """Create a set of tuples for use in np.pad
 
     Parameters
