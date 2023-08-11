@@ -78,7 +78,9 @@ class Labeler(TransformerMixin, BaseEstimator):
         self._mask = (
             cur_mask[None, ...]
             if self._mask.size < 2
-            else np.r_[self._mask, cur_mask[None, ...]]
+            else utils.equalize_list_to_array([self._mask, cur_mask[None, ...]])
+            .astype(bool)
+            .squeeze()
         )
         retval = retval.astype(np.float64)
         return retval
@@ -174,7 +176,11 @@ class Labeler(TransformerMixin, BaseEstimator):
                 self._x_hat = self._x_hat[self._mask.flatten()]
                 self._x_hat = self._x_hat.reshape(n, -1, *end_shape)
             else:
+                print([i.shape for i in data_list])
                 self._x_hat = np.concatenate(data_list)
+                print(self._mask)
+                print(self._mask.shape)
+                print(self._x_hat.shape)
                 self._x_hat = self._x_hat[self._mask.flatten()]
             self._x_lengths = [i.shape[0] for i in data_list]
         else:
