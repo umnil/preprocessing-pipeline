@@ -170,10 +170,10 @@ class TestWindower:
         # Concatenated 4
         windower = Windower(samples_per_window=500, label_scheme=4, window_step=250)
         x = windower.fit_transform(data, labels)
-        assert x.shape == (15, 10, 1000)
+        assert x.shape == (15, 10, 1500)
 
         # Unconcatenated 0
-        data, labels = create_mock_data(False)
+        data, labels = create_mock_data(concatenated=False, uniform=False)
         windower = Windower(samples_per_window=500, window_step=250, axis=[1, -1])
         x = windower.fit_transform(data, labels)
         assert x.shape == (3, 19, 10, 500)
@@ -190,4 +190,4 @@ class TestWindower:
             samples_per_window=500, label_scheme=4, window_step=250, axis=[1, -1]
         )
         x = windower.fit_transform(data, labels)
-        assert x.shape == (3, 5, 10, 1000)
+        assert x.shape == (3, 5, 10, 1500)

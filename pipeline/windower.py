@@ -276,10 +276,16 @@ class Windower(TransformerMixin, BaseEstimator):
             y = self._y
             if y.ndim > 1:
                 idxs = [self._window_by_label(i, True)[1] for i in y]
-                x = np.array([[a[..., i] for i in idx] for a, idx in zip(x, idxs)])
+                print(type(idxs[0]))
+                x = np.array(
+                    [
+                        utils.equalize_list_to_array([a[..., i] for i in idx])
+                        for a, idx in zip(x, idxs)
+                    ]
+                )
             else:
                 _, idxs = self._window_by_label(self._y, True)
-                x = np.array([x[..., i] for i in idxs]).squeeze()
+                x = utils.equalize_list_to_array([x[..., i] for i in idxs]).squeeze()
 
         self._x = x
 
