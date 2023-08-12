@@ -35,6 +35,11 @@ def create_mock_raw(uniform=True, version=0) -> mne.io.RawArray:
             raw.annotations.append(3.75, 1.25, "label_1")
         elif version == 2:
             # 6 seconds
+            t = 6
+            n = t * sfreq
+            raw = mne.io.RawArray(
+                np.random.randn(c, n), mne.create_info(ch_names=c, sfreq=sfreq)
+            )
             raw.annotations.append(1.0, 0.50, "label_1")
             raw.annotations.append(1.5, 1.75, "label_2")
             raw.annotations.append(3.25, 1.5, "label_3")
@@ -260,18 +265,24 @@ def test_labeler_transform():
     raw_list = [create_mock_raw(False), create_mock_raw(False, 1)]
     labeler = Labeler(labels=["label_1", "label_2"], concatenate=False)
     x = labeler.fit_transform(raw_list)
-    assert x.shape == (2, 3000, 6, 1)
+    y = labeler._y_hat
+    assert x.shape == (2, 3500, 6, 1)
+    assert x.shape[:2] == y.shape
 
     # Test transform with a list of mne.Raw objects with different event timing
     # and lengths
     raw_list = [create_mock_raw(False), create_mock_raw(False, 2)]
     labeler = Labeler(labels=["label_1", "label_2"])
     x = labeler.fit_transform(raw_list)
-    assert labeler._y_hat.shape == (5000,)
-    assert x.shape == (5000, 6, 1)
+    y = labeler._y_hat
+    assert labeler._y_hat.shape == (6000,)
+    assert x.shape == (6000, 6, 1)
+    assert x.shape[0:1] == y.shape
 
     # Test transform with different event timings andn lengths and no concatenation
     raw_list = [create_mock_raw(False), create_mock_raw(False, 2)]
     labeler = Labeler(labels=["label_1", "label_2"], concatenate=False)
     x = labeler.fit_transform(raw_list)
-    assert x.shape == (2, 2500, 6, 1)
+    y = labeler._y_hat
+    assert x.shape == (2, 3500, 6, 1)
+    assert x.shape[:2] == y.shape

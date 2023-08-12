@@ -62,7 +62,11 @@ class Labeler(TransformerMixin, BaseEstimator):
         assert a.shape[0] == len(
             mask
         ), f"a has shape {a.shape} and there are {len(mask)} masks"
-        return utils.equalize_list_to_array([i[m] for i, m in zip(a, mask)])
+        a_list: List = utils.array_to_clean_list(a)
+        print("al", [i.shape for i in a_list])
+        print("ma", [i.shape for i in mask])
+        a_list: List = [i[m] for i, m in zip(a_list, mask)]
+        return utils.equalize_list_to_array(a_list, axis=0)
 
     def filter_labels(self, y_labels: List[str]) -> Tuple[np.ndarray, np.ndarray]:
         """Given a list of string labels obtained from mne annotations convert
@@ -189,15 +193,16 @@ class Labeler(TransformerMixin, BaseEstimator):
                 data = np.moveaxis(np.expand_dims(data, -1), 0, 1)
                 data_list.append(data)
 
-            self._x_hat = utils.equalize_list_to_array(data_list)
+            self._x_hat = utils.equalize_list_to_array(data_list, axis=0)
             original_shape: Tuple = self._x_hat.shape
             end_shape: Tuple = original_shape[2:]
             n: int = original_shape[0]
-            print(self._x_hat.shape)
             self._x_hat = self.apply_mask(self._x_hat, self._mask)
 
             if self.concatenate:
                 self._x_hat = np.concatenate(self._x_hat)
+                non_nan_idxs: np.array = ~np.isnan(self._x_hat)[:, 0].squeeze()
+                self._x_hat = self._x_hat[non_nan_idxs]
 
             self._x_lengths = [i.shape[0] for i in data_list]
         else:
@@ -209,3 +214,8 @@ class Labeler(TransformerMixin, BaseEstimator):
             self._x_hat = self._x_hat[self._mask]
 
         return self._x_hat
+
+    @property
+    def is_masked(self) -> bool:
+        """This property returns true if the `_x_hat` value contains nan values"""
+        return np.isnan(self._x_hat).any()
