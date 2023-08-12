@@ -41,13 +41,36 @@ class Labeler(TransformerMixin, BaseEstimator):
         self._y_hat: np.ndarray = np.empty([])
         self._x_lengths: List[int] = []
         self._y_lengths: List[int] = []
-        self._mask: np.ndarray = np.empty([])
+        self._mask: List = []
 
-    def filter_labels(self, y_labels: List[str]) -> np.ndarray:
+    @staticmethod
+    def apply_mask(a: np.ndarray, mask: List) -> np.ndarray:
+        """Applies each mask in list to each row element in a
+
+        Parameters
+        ----------
+        a : np.ndarray
+            The input array
+        mask : List
+            A list of masks for each row component in a
+
+        Returns
+        -------
+        np.ndarray
+            `a` with data masked
+        """
+        assert a.shape[0] == len(
+            mask
+        ), f"a has shape {a.shape} and there are {len(mask)} masks"
+        return utils.equalize_list_to_array([i[m] for i, m in zip(a, mask)])
+
+    def filter_labels(self, y_labels: List[str]) -> Tuple[np.ndarray, np.ndarray]:
         """Given a list of string labels obtained from mne annotations convert
         these to numerical labels depending on whether they're provided to the
         labeler class. The result is always a list of integers. Data where
-        labels are not requested will be removed.
+        labels are not requested will be removed. A mask is initialized on the
+        class for use when transforming the x data to remove the corresponding
+        data that occurs with the removed labels
 
         Parameters
         ----------
@@ -58,6 +81,9 @@ class Labeler(TransformerMixin, BaseEstimator):
         Returns
         -------
         np.ndarray
+            The filtered labels
+        np.ndarray
+            A mask for how the labels were filtered
         """
         cur_mask: np.ndarray = np.array([True] * len(y_labels))
         retval: np.ndarray
@@ -75,15 +101,8 @@ class Labeler(TransformerMixin, BaseEstimator):
         else:
             retval = np.unique(y_labels, return_inverse=True)[1]
 
-        self._mask = (
-            cur_mask[None, ...]
-            if self._mask.size < 2
-            else utils.equalize_list_to_array([self._mask, cur_mask[None, ...]])
-            .astype(bool)
-            .squeeze()
-        )
         retval = retval.astype(np.float64)
-        return retval
+        return retval, cur_mask
 
     def fit(self, x: Union[mne.io.Raw, List[mne.io.Raw]], *args, **kwargs) -> "Labeler":
         """Fit the labeler to the raw data
@@ -99,14 +118,16 @@ class Labeler(TransformerMixin, BaseEstimator):
             self
         """
         if isinstance(x, List):
-            y_hat_list: List = [self.filter_labels(self.load_labels(i)) for i in x]
+            filtered_labels: List = [self.filter_labels(self.load_labels(i)) for i in x]
+            y_hat_list: List = [i[0] for i in filtered_labels]
+            mask_list: List = [i[1] for i in filtered_labels]
             self._y_lengths = [i.shape[-1] for i in y_hat_list]
-            if not self.concatenate:
-                self._y_hat = utils.equalize_list_to_array(y_hat_list)
-            else:
+            self._y_hat = utils.equalize_list_to_array(y_hat_list)
+            self._mask = mask_list
+            if self.concatenate:
                 self._y_hat = np.concatenate(y_hat_list)
         else:
-            self._y_hat = self.filter_labels(self.load_labels(x))
+            self._y_hat, self._mask = self.filter_labels(self.load_labels(x))
             self._y_lengths = [self._y_hat.shape[-1]]
         return self
 
@@ -167,21 +188,17 @@ class Labeler(TransformerMixin, BaseEstimator):
                 data = i.get_data()
                 data = np.moveaxis(np.expand_dims(data, -1), 0, 1)
                 data_list.append(data)
-            if not self.concatenate:
-                self._x_hat = utils.equalize_list_to_array(data_list)
-                original_shape: Tuple = self._x_hat.shape
-                end_shape: Tuple = original_shape[2:]
-                n: int = original_shape[0]
-                self._x_hat = self._x_hat.reshape(-1, *end_shape)
-                self._x_hat = self._x_hat[self._mask.flatten()]
-                self._x_hat = self._x_hat.reshape(n, -1, *end_shape)
-            else:
-                print([i.shape for i in data_list])
-                self._x_hat = np.concatenate(data_list)
-                print(self._mask)
-                print(self._mask.shape)
-                print(self._x_hat.shape)
-                self._x_hat = self._x_hat[self._mask.flatten()]
+
+            self._x_hat = utils.equalize_list_to_array(data_list)
+            original_shape: Tuple = self._x_hat.shape
+            end_shape: Tuple = original_shape[2:]
+            n: int = original_shape[0]
+            print(self._x_hat.shape)
+            self._x_hat = self.apply_mask(self._x_hat, self._mask)
+
+            if self.concatenate:
+                self._x_hat = np.concatenate(self._x_hat)
+
             self._x_lengths = [i.shape[0] for i in data_list]
         else:
             x = x.copy() if self.channels is None else x.copy().pick(self.channels)
@@ -189,6 +206,6 @@ class Labeler(TransformerMixin, BaseEstimator):
             self._x_hat = np.moveaxis(  # size = (time, channels, 1)
                 np.expand_dims(data, -1), 0, 1
             )
-            self._x_hat = self._x_hat[self._mask.flatten()]
+            self._x_hat = self._x_hat[self._mask]
 
         return self._x_hat

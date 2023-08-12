@@ -79,7 +79,7 @@ def test_labeler_filter_labels():
     raw: mne.io.RawArray = create_mock_raw()
     labeler: Labeler = Labeler()
     y_labels: List[str] = labeler.load_labels(raw)
-    observed: np.ndarray = labeler.filter_labels(y_labels)
+    observed: np.ndarray = labeler.filter_labels(y_labels)[0]
     expected: np.ndarray = np.array([[0, 1, 2, 3, 1]] * 1000).T.flatten()
     assert observed.shape == expected.shape
     assert (observed == expected).all()
@@ -87,7 +87,7 @@ def test_labeler_filter_labels():
     # Test with specified labels no None. All other labels should be removed
     labeler = Labeler(labels=["label_1", "label_2"])
     y_labels = labeler.load_labels(raw)
-    observed = labeler.filter_labels(y_labels)
+    observed = labeler.filter_labels(y_labels)[0]
     expected = np.array([[0, 1, 0]] * 1000).T.flatten()
     assert observed.shape == expected.shape
     assert (observed == expected).all()
@@ -95,7 +95,7 @@ def test_labeler_filter_labels():
     # Test with specified labels in different order no None
     labeler = Labeler(labels=["label_2", "label_1"])
     y_labels = labeler.load_labels(raw)
-    observed = labeler.filter_labels(y_labels)
+    observed = labeler.filter_labels(y_labels)[0]
     expected = np.array([[1, 0, 1]] * 1000).T.flatten()
     assert observed.shape == expected.shape
     assert (observed == expected).all()
@@ -103,7 +103,7 @@ def test_labeler_filter_labels():
     # Test with specified labels in different order with None
     labeler = Labeler(labels=["None", "label_1", "label_2"])
     y_labels = labeler.load_labels(raw)
-    observed = labeler.filter_labels(y_labels)
+    observed = labeler.filter_labels(y_labels)[0]
     expected = np.array([[0, 1, 2, 1]] * 1000).T.flatten()
     assert observed.shape == expected.shape
     assert (observed == expected).all()
@@ -114,7 +114,7 @@ def test_labeler_filter_labels_nonuniform():
     raw: mne.io.RawArray = create_mock_raw(False)
     labeler: Labeler = Labeler()
     y_labels: List[str] = labeler.load_labels(raw)
-    observed: np.ndarray = labeler.filter_labels(y_labels)
+    observed: np.ndarray = labeler.filter_labels(y_labels)[0]
     expected: np.ndarray = np.array(
         [0] * 1000 + [1] * 500 + [2] * 750 + [3] * 1500 + [1] * 1250
     )
@@ -124,7 +124,7 @@ def test_labeler_filter_labels_nonuniform():
     # Test with specified labels no None. All other labels should be removed
     labeler = Labeler(labels=["label_1", "label_2"])
     y_labels = labeler.load_labels(raw)
-    observed = labeler.filter_labels(y_labels)
+    observed = labeler.filter_labels(y_labels)[0]
     expected = np.array([0] * 500 + [1] * 750 + [0] * 1250)
     assert observed.shape == expected.shape
     assert (observed == expected).all()
@@ -132,7 +132,7 @@ def test_labeler_filter_labels_nonuniform():
     # Test with specified labels in different order no None
     labeler = Labeler(labels=["label_2", "label_1"])
     y_labels = labeler.load_labels(raw)
-    observed = labeler.filter_labels(y_labels)
+    observed = labeler.filter_labels(y_labels)[0]
     expected = np.array([1] * 500 + [0] * 750 + [1] * 1250)
     assert observed.shape == expected.shape
     assert (observed == expected).all()
@@ -140,7 +140,7 @@ def test_labeler_filter_labels_nonuniform():
     # Test with specified labels in different order with None
     labeler = Labeler(labels=["None", "label_1", "label_2"])
     y_labels = labeler.load_labels(raw)
-    observed = labeler.filter_labels(y_labels)
+    observed = labeler.filter_labels(y_labels)[0]
     expected = np.array([0] * 1000 + [1] * 500 + [2] * 750 + [1] * 1250)
     assert observed.shape == expected.shape
     assert (observed == expected).all()
@@ -215,7 +215,6 @@ def test_labeler_transform():
     labeler = Labeler(labels=["label_1", "label_2"])
     x = labeler.fit_transform(raw_list)
     assert labeler._y_hat.shape == (6000,)
-    assert labeler._mask.shape == (2, 5000)
     assert x.shape == (6000, 6, 1)
 
     # Test transform with no concatenation
@@ -242,7 +241,6 @@ def test_labeler_transform():
     labeler = Labeler(labels=["label_1", "label_2"])
     x = labeler.fit_transform(raw_list)
     assert labeler._y_hat.shape == (5000,)
-    assert labeler._mask.shape == (2, 5000)
     assert x.shape == (5000, 6, 1)
 
     # Test transform with no concatenation
@@ -256,7 +254,6 @@ def test_labeler_transform():
     labeler = Labeler(labels=["label_1", "label_2"])
     x = labeler.fit_transform(raw_list)
     assert labeler._y_hat.shape == (6000,)
-    assert labeler._mask.shape == (2, 5000)
     assert x.shape == (6000, 6, 1)
 
     # Test transform with different event timing and no concatenation
@@ -271,7 +268,6 @@ def test_labeler_transform():
     labeler = Labeler(labels=["label_1", "label_2"])
     x = labeler.fit_transform(raw_list)
     assert labeler._y_hat.shape == (5000,)
-    assert labeler._mask.shape == (2, 5000)
     assert x.shape == (5000, 6, 1)
 
     # Test transform with different event timings andn lengths and no concatenation
