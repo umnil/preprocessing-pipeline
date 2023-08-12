@@ -188,17 +188,24 @@ class Windower(TransformerMixin, BaseEstimator):
         # calculate the number of windows
         t: int = a.shape[-1]
         n_win: int = int(t / self.window_step)
+
+        # n_win +1 to ensure we go *over* the time. We'll cut off later
         window_start_idxs = np.linspace(0, t, n_win + 1).astype(np.int32)
         window_idxs = np.array(
             [np.arange(s, s + self.samples_per_window) for s in window_start_idxs]
         )
+
+        # Here we cut back any access beyond the time
         window_idxs = np.array([idxs for idxs in window_idxs if ~np.any(idxs > t)])
         a = np.stack([a[..., i] for i in window_idxs])
         # shape should now be (n_win, ..., n_time)
         # where n_time = samples_per_window
+        expected_n_windows: int = int(
+            (t - self.samples_per_window) / self.window_step + 1
+        )
         assert (
-            a.shape[0] == n_win - 1
-        ), f"Failed to window the data. Expected {n_win-1}, but got {a.shape[0]}"
+            a.shape[0] == expected_n_windows
+        ), f"Failed to window the data. Expected {expected_n_windows}, but got {a.shape[0]}"
         assert a.shape[-1] == self.samples_per_window
 
         # replace time axis. Shape should now be (... n_windows, ..., n_time)

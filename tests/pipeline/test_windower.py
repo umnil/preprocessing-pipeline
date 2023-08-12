@@ -139,6 +139,12 @@ class TestWindower:
         x = windower.fit_transform(data, labels)
         assert x.shape == (3, 19, 10, 500)
 
+        # Unconcatenated 0 Windowed precise
+        data, labels = create_mock_data(False)
+        windower = Windower(samples_per_window=1000, window_step=1000, axis=[1, -1])
+        x = windower.fit_transform(data, labels)
+        assert x.shape == (3, 5, 10, 1000)
+
         # Unconcatenated 3
         windower = Windower(
             samples_per_window=500, label_scheme=3, window_step=250, axis=[1, -1]
