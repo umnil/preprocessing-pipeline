@@ -63,8 +63,6 @@ class Labeler(TransformerMixin, BaseEstimator):
             mask
         ), f"a has shape {a.shape} and there are {len(mask)} masks"
         a_list: List = utils.array_to_clean_list(a)
-        print("al", [i.shape for i in a_list])
-        print("ma", [i.shape for i in mask])
         a_list: List = [i[m] for i, m in zip(a_list, mask)]
         return utils.equalize_list_to_array(a_list, axis=0)
 
