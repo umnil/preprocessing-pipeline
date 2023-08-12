@@ -2,6 +2,15 @@ import numpy as np
 from typing import List, Tuple
 
 
+def array_to_clean_list(a: np.array) -> List:
+    """Given an array `a` that may or may not have been created using
+    `equalize_list_to_array` convert to a list of arrays and remove any NaN
+    Padding
+    """
+    masked_array: np.ma.core.MaskedArray = np.ma.masked_invalid(a)
+    return [i.data[~(i.mask[:, 0].squeeze())] for i in masked_array]
+
+
 def equalize_list_to_array(a: List[np.ndarray], axis: int = -1) -> np.ndarray:
     """Given a list of ragged numpy arrays, this function fills the missing
     data with NaN to return an array with squre dimensions
