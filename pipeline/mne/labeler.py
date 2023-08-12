@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd  # type: ignore
 
 from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, cast
 
 from .. import utils
 
@@ -63,7 +63,7 @@ class Labeler(TransformerMixin, BaseEstimator):
             mask
         ), f"a has shape {a.shape} and there are {len(mask)} masks"
         a_list: List = utils.array_to_clean_list(a)
-        a_list: List = [i[m] for i, m in zip(a_list, mask)]
+        a_list = [i[m] for i, m in zip(a_list, mask)]
         return utils.equalize_list_to_array(a_list, axis=0)
 
     def filter_labels(self, y_labels: List[str]) -> Tuple[np.ndarray, np.ndarray]:
@@ -129,7 +129,8 @@ class Labeler(TransformerMixin, BaseEstimator):
             if self.concatenate:
                 self._y_hat = np.concatenate(y_hat_list)
         else:
-            self._y_hat, self._mask = self.filter_labels(self.load_labels(x))
+            self._y_hat, mask = self.filter_labels(self.load_labels(x))
+            self._mask = cast(List, mask)
             self._y_lengths = [self._y_hat.shape[-1]]
         return self
 
@@ -192,14 +193,11 @@ class Labeler(TransformerMixin, BaseEstimator):
                 data_list.append(data)
 
             self._x_hat = utils.equalize_list_to_array(data_list, axis=0)
-            original_shape: Tuple = self._x_hat.shape
-            end_shape: Tuple = original_shape[2:]
-            n: int = original_shape[0]
             self._x_hat = self.apply_mask(self._x_hat, self._mask)
 
             if self.concatenate:
                 self._x_hat = np.concatenate(self._x_hat)
-                non_nan_idxs: np.array = ~np.isnan(self._x_hat)[:, 0].squeeze()
+                non_nan_idxs: np.bool_ = ~(np.isnan(self._x_hat)[:, 0].squeeze())
                 self._x_hat = self._x_hat[non_nan_idxs]
 
             self._x_lengths = [i.shape[0] for i in data_list]

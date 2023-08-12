@@ -9,7 +9,6 @@ from pipeline.inline.windower import Windower
 
 
 class TestWindower:
-
     pipeline_dir: str = os.path.dirname(__file__)
     test_dir: str = os.path.join(pipeline_dir, "..", "..")
     data_dir: str = os.path.join(test_dir, "data")
@@ -21,7 +20,7 @@ class TestWindower:
         data_dir, example_data_202201_filename
     )
 
-    def make_packet(self, ch1_n=10, ch2_n=4):
+    def make_packet(self, ch1_n=10, ch2_n=4) -> List:
         """For dummy testing"""
         return [
             (128 * np.random.rand(ch1_n))
@@ -32,7 +31,7 @@ class TestWindower:
             .tolist(),  # Channel 2 has 4 points
         ]
 
-    def test__make_labels(self):
+    def test__make_labels(self) -> None:
         data: pd.DataFrame = pd.read_pickle(self.data_filepath)
         data = data.query("state == 2")
         assert data.shape[0] == 300
@@ -74,7 +73,7 @@ class TestWindower:
         w = Windower(window_size=15, window_step=15, trial_size=150, label_scheme=4)
         labels = w._make_labels(y)
 
-    def test__get_channel_packets(self):
+    def test__get_channel_packets(self) -> None:
         ch1: List[int] = [0, 1, 2, 3, 4, 5, 6, 7]
         ch2: List[int] = [0, 1, 2, 3]
         p1: List[int] = ch1[:4] + ch2[:2]
@@ -89,7 +88,7 @@ class TestWindower:
         _ch2: np.ndarray = w._get_channel_packets(X, 1)
         assert _ch2.tolist() == pch2
 
-    def test__transform_channel(self):
+    def test__transform_channel(self) -> None:
         ch1: List[int] = [0, 1, 2, 3, 4, 5, 6, 7]
         ch2: List[int] = [0, 1, 2, 3]
         p1: List[int] = ch1[:4] + ch2[:2]
@@ -135,7 +134,7 @@ class TestWindower:
         out = wn._transform_channel(ch1_packets)
         assert out.shape == (17, 24880)
 
-    def test__fit_transform(self):
+    def test__fit_transform(self) -> None:
         ch1: List[int] = [0, 1, 2, 3, 4, 5, 6, 7]
         ch2: List[int] = [0, 1, 2, 3]
         p1: List[int] = ch1[:4] + ch2[:2]
@@ -158,7 +157,7 @@ class TestWindower:
         X_hat: np.ndarray = w.fit_transform(X, y)
         assert X_hat.shape == (1716, 1312)
 
-    def test_get_trial_window_packets(self):
+    def test_get_trial_window_packets(self) -> None:
         # Dummy data
         X: np.ndarray = np.array(
             [np.hstack(self.make_packet()) for i in range(20)]
@@ -173,16 +172,16 @@ class TestWindower:
         window_packet_idxs = w.get_trial_window_packets(0)
         assert window_packet_idxs.shape == (2, 5)
 
-    def test_get_label_packets(self):
+    def test_get_label_packets(self) -> None:
         y: np.ndarray = np.hstack([[0] * 5, [1] * 5] * 2)
         w: Windower = Windower(
             window_size=5, window_step=5, trial_size=10, packet_channel_sizes=[10, 4]
         )
         w._y = y
-        window_packet_idxs: List = w.get_label_packets()
-        assert np.array(window_packet_idxs).shape == (4, 5)
+        window_packet_idxs: np.ndarray = w.get_label_packets()
+        assert window_packet_idxs.shape == (4, 5)
 
-    def test_window_packets(self):
+    def test_window_packets(self) -> None:
         """This test is required to ensure that if the window_size ever
         changes, that the window_packets array will as well"""
 

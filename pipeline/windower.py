@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, cast
 from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
 from . import utils
 
@@ -112,9 +112,11 @@ class Windower(TransformerMixin, BaseEstimator):
             # Windows by labels
             y = self._y
             if y.ndim > 1:
-                y = utils.equalize_list_to_array([self._window_by_label(i) for i in y])
+                y = utils.equalize_list_to_array(
+                    [cast(np.ndarray, self._window_by_label(i)) for i in y]
+                )
             else:
-                y = self._window_by_label(y)
+                y = cast(np.ndarray, self._window_by_label(y))
             y_transformed = y
 
         self._n_windows = y_transformed.shape[0]
@@ -252,11 +254,11 @@ class Windower(TransformerMixin, BaseEstimator):
             x = np.moveaxis(x, self.axis, range(-len(self.axis), 0))
             x = x.reshape(*x.shape[: -len(self.axis)], -1)
             dim_list[[np.arange(-len(self.axis), 0), self.axis]] = dim_list[
-                [self.axis, np.arange(-len(self.axis), 0)]
+                [self.axis, np.arange(-len(self.axis), 0)]  # type: ignore
             ]
 
         if self.label_scheme < 4:
-            x = self._window_transform(x)
+            x = cast(np.ndarray, self._window_transform(x))
             x = np.moveaxis(x, dim_list, np.arange(dim_list.size)).squeeze()
             if self.label_scheme == 3:
                 # Remove windows with mixed labelling

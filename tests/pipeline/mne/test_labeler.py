@@ -1,21 +1,21 @@
 import mne
 import numpy as np
+from mne.io import RawArray  # type: ignore
+from mne import create_info, set_log_level  # type: ignore
 from pipeline.mne.labeler import Labeler
 from typing import List
 
 
 # Create a mock mne.Raw object for testing
-def create_mock_raw(uniform=True, version=0) -> mne.io.RawArray:
-    mne.set_log_level("critical")  # supress logs
+def create_mock_raw(uniform=True, version=0) -> RawArray:
+    set_log_level("critical")  # supress logs
 
     # 5 seconds of data with 6 channels
     sfreq: int = 1000
     t: int = 5
     n: int = t * sfreq
     c: int = 6
-    raw = mne.io.RawArray(
-        np.random.randn(c, n), mne.create_info(ch_names=c, sfreq=sfreq)
-    )
+    raw = mne.io.RawArray(np.random.randn(c, n), create_info(ch_names=c, sfreq=sfreq))
     if uniform:
         raw.annotations.append(1.0, 1.0, "label_1")
         raw.annotations.append(2.0, 1.0, "label_2")
@@ -38,7 +38,7 @@ def create_mock_raw(uniform=True, version=0) -> mne.io.RawArray:
             t = 6
             n = t * sfreq
             raw = mne.io.RawArray(
-                np.random.randn(c, n), mne.create_info(ch_names=c, sfreq=sfreq)
+                np.random.randn(c, n), create_info(ch_names=c, sfreq=sfreq)
             )
             raw.annotations.append(1.0, 0.50, "label_1")
             raw.annotations.append(1.5, 1.75, "label_2")
@@ -48,9 +48,9 @@ def create_mock_raw(uniform=True, version=0) -> mne.io.RawArray:
 
 
 # Test the Labeler class
-def test_labeler_load_labels():
+def test_labeler_load_labels() -> None:
     # Test load_labels
-    raw: mne.io.RawArray = create_mock_raw()
+    raw: RawArray = create_mock_raw()
     labeler: Labeler = Labeler(labels=["label_1", "label_2"])
     result: List[str] = labeler.load_labels(raw)
     expected: List[str] = (
@@ -61,10 +61,10 @@ def test_labeler_load_labels():
     assert result == expected
 
     # Test load_labels, non uniform
-    raw: mne.io.RawArray = create_mock_raw(False)
-    labeler: Labeler = Labeler(labels=["label_1", "label_2"])
-    result: List[str] = labeler.load_labels(raw)
-    expected: List[str] = (
+    raw = create_mock_raw(False)
+    labeler = Labeler(labels=["label_1", "label_2"])
+    result = labeler.load_labels(raw)
+    expected = (
         np.array(
             ["None"] * 1000
             + ["label_1"] * 500
@@ -79,9 +79,9 @@ def test_labeler_load_labels():
 
 
 # Test filter_labels
-def test_labeler_filter_labels():
+def test_labeler_filter_labels() -> None:
     # Test with no labels
-    raw: mne.io.RawArray = create_mock_raw()
+    raw: RawArray = create_mock_raw()
     labeler: Labeler = Labeler()
     y_labels: List[str] = labeler.load_labels(raw)
     observed: np.ndarray = labeler.filter_labels(y_labels)[0]
@@ -114,9 +114,9 @@ def test_labeler_filter_labels():
     assert (observed == expected).all()
 
 
-def test_labeler_filter_labels_nonuniform():
+def test_labeler_filter_labels_nonuniform() -> None:
     # Test with no labels
-    raw: mne.io.RawArray = create_mock_raw(False)
+    raw: RawArray = create_mock_raw(False)
     labeler: Labeler = Labeler()
     y_labels: List[str] = labeler.load_labels(raw)
     observed: np.ndarray = labeler.filter_labels(y_labels)[0]
@@ -151,16 +151,16 @@ def test_labeler_filter_labels_nonuniform():
     assert (observed == expected).all()
 
 
-def test_labeler_fit():
+def test_labeler_fit() -> None:
     # Test fit with a single mne.Raw object
-    raw: mne.io.RawArray = create_mock_raw()
+    raw: RawArray = create_mock_raw()
     labeler: Labeler = Labeler(labels=["label_1", "label_2"])
     labeler.fit(raw)
     assert labeler._y_hat.size == 3000
     assert labeler._y_lengths == [3000]
 
     # Test fit with a list of mne.Raw objects
-    raw_list: List[mne.io.RawArray] = [create_mock_raw(), create_mock_raw()]
+    raw_list = [create_mock_raw(), create_mock_raw()]
     labeler = Labeler(labels=["label_1", "label_2"])
     labeler.fit(raw_list)
     assert labeler._y_hat.size == 6000
@@ -168,7 +168,7 @@ def test_labeler_fit():
     assert labeler._y_lengths == [3000, 3000]
 
     # Test fit with list and don't concatenate
-    raw_list: List[mne.io.RawArray] = [create_mock_raw(), create_mock_raw()]
+    raw_list = [create_mock_raw(), create_mock_raw()]
     labeler = Labeler(labels=["label_1", "label_2"], concatenate=False)
     labeler.fit(raw_list)
     assert labeler._y_hat.size == 6000
@@ -179,7 +179,7 @@ def test_labeler_fit():
     # Non Uniform
     # Test fit with a single mne.Raw object
     raw = create_mock_raw(False)
-    labeler: Labeler = Labeler(labels=["label_1", "label_2"])
+    labeler = Labeler(labels=["label_1", "label_2"])
     labeler.fit(raw)
     assert labeler._y_hat.size == 500 + 750 + 1250
     assert labeler._y_lengths == [2500]
@@ -202,28 +202,28 @@ def test_labeler_fit():
     assert labeler._y_lengths == [2500, 2500]
 
 
-def test_labeler_transform():
+def test_labeler_transform() -> None:
     # Test transform with a single mne.Raw object
-    raw: mne.io.RawArray = create_mock_raw()
+    raw: RawArray = create_mock_raw()
     labeler: Labeler = Labeler()
     x: np.ndarray = labeler.fit_transform(raw)
     assert x.shape == (5000, 6, 1)
 
     # Test transform with a single mne.Raw object
-    raw: mne.io.RawArray = create_mock_raw()
-    labeler: Labeler = Labeler(labels=["label_1", "label_2"])
+    raw = create_mock_raw()
+    labeler = Labeler(labels=["label_1", "label_2"])
     x = labeler.fit_transform(raw)
     assert x.shape == (3000, 6, 1)
 
     # Test transform with a list of mne.Raw objects
-    raw_list: List[mne.io.RawArray] = [create_mock_raw(), create_mock_raw()]
+    raw_list = [create_mock_raw(), create_mock_raw()]
     labeler = Labeler(labels=["label_1", "label_2"])
     x = labeler.fit_transform(raw_list)
     assert labeler._y_hat.shape == (6000,)
     assert x.shape == (6000, 6, 1)
 
     # Test transform with no concatenation
-    raw_list: List[mne.io.RawArray] = [create_mock_raw(), create_mock_raw()]
+    raw_list = [create_mock_raw(), create_mock_raw()]
     labeler = Labeler(labels=["label_1", "label_2"], concatenate=False)
     x = labeler.fit_transform(raw_list)
     assert x.shape == (2, 3000, 6, 1)
@@ -232,12 +232,12 @@ def test_labeler_transform():
     # Test transform with a single mne.Raw object
     raw = create_mock_raw(False)
     labeler = Labeler()
-    x: np.ndarray = labeler.fit_transform(raw)
+    x = labeler.fit_transform(raw)
     assert x.shape == (5000, 6, 1)
 
     # Test transform with a single mne.Raw object
     raw = create_mock_raw(False)
-    labeler: Labeler = Labeler(labels=["label_1", "label_2"])
+    labeler = Labeler(labels=["label_1", "label_2"])
     x = labeler.fit_transform(raw)
     assert x.shape == (2500, 6, 1)
 

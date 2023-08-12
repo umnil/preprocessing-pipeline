@@ -1,10 +1,10 @@
 import numpy as np
-import pytest
 from pipeline.windower import Windower
+from typing import cast, Tuple
 
 
 # Create mock data for testing
-def create_mock_data(concatenated=True, uniform=True) -> np.ndarray:
+def create_mock_data(concatenated=True, uniform=True) -> Tuple[np.ndarray, np.ndarray]:
     # Create mock data with the desired shape for windowing
     # concatenated shape (15000, 10, 1)
     # unconcatenated shape (3, 5000, 10, 1)
@@ -30,7 +30,7 @@ def create_mock_data(concatenated=True, uniform=True) -> np.ndarray:
 # Test the Windower class
 class TestWindower:
     # Test the _window_transform method
-    def test__window_transform(self):
+    def test__window_transform(self) -> None:
         # Concatenated
         data: np.ndarray
         labels: np.ndarray
@@ -38,7 +38,7 @@ class TestWindower:
         assert data.shape == (15000, 10, 1)
         assert labels.shape == (15000,)
         windower: Windower = Windower(samples_per_window=500, window_step=250)
-        x: np.ndarray = windower._window_transform(data, axis=0)
+        x: np.ndarray = cast(np.ndarray, windower._window_transform(data, axis=0))
         assert x.shape == (59, 10, 1, 500)
 
         # Unconcatenated
@@ -46,11 +46,11 @@ class TestWindower:
         assert data.shape == (3, 5000, 10, 1)
         assert labels.shape == (3, 5000)
         windower = Windower(samples_per_window=500, window_step=250, axis=[1, -1])
-        x = windower._window_transform(data, axis=1)
+        x = cast(np.ndarray, windower._window_transform(data, axis=1))
         assert x.shape == (3, 19, 10, 1, 500)
 
     # Test _window_by_label
-    def test__window_by_label(self):
+    def test__window_by_label(self) -> None:
         # Concatenated
         data: np.ndarray
         labels: np.ndarray
@@ -58,11 +58,11 @@ class TestWindower:
         windower: Windower = Windower(
             samples_per_window=500, window_step=250, label_scheme=4
         )
-        y: np.ndarray = windower._window_by_label(labels)
+        y: np.ndarray = cast(np.ndarray, windower._window_by_label(labels))
         assert y.shape == (15,)
 
     # Test _window_by_label
-    def test__window_by_label_non_uniform(self):
+    def test__window_by_label_non_uniform(self) -> None:
         # Concatenated
         data: np.ndarray
         labels: np.ndarray
@@ -70,10 +70,10 @@ class TestWindower:
         windower: Windower = Windower(
             samples_per_window=500, window_step=250, label_scheme=4
         )
-        y: np.ndarray = windower._window_by_label(labels)
+        y: np.ndarray = cast(np.ndarray, windower._window_by_label(labels))
         assert y.shape == (15,)
 
-    def test__make_labels(self):
+    def test__make_labels(self) -> None:
         # Concatenated 0
         data: np.ndarray
         labels: np.ndarray
@@ -114,7 +114,7 @@ class TestWindower:
         y = windower._make_labels(labels)
         assert y.shape == (3, 5)
 
-    def test_transform(self):
+    def test_transform(self) -> None:
         # Concatenated 0
         data: np.ndarray
         labels: np.ndarray
@@ -153,7 +153,7 @@ class TestWindower:
         x = windower.fit_transform(data, labels)
         assert x.shape == (3, 5, 10, 1000)
 
-    def test_transform_non_uniform(self):
+    def test_transform_non_uniform(self) -> None:
         # Concatenated 0
         data: np.ndarray
         labels: np.ndarray
