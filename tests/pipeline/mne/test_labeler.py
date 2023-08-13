@@ -236,5 +236,5 @@ def test_labeler_transform() -> None:
     labeler = Labeler(labels=["label_1", "label_2"])
     x = labeler.fit_transform(raw_list)
     y = labeler._y_hat
-    assert labeler._y_hat.shape == (2, 3500)
+    assert y.shape == (2, 3500)
     assert x.shape == (2, 6, 3500)

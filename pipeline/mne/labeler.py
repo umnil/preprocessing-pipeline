@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd  # type: ignore
 
 from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
-from typing import List, Optional, Tuple, Union, cast
+from typing import List, Optional, Tuple, Union
 
 from .. import utils
 
@@ -58,8 +58,6 @@ class Labeler(TransformerMixin, BaseEstimator):
             mask
         ), f"a has shape {a.shape} and there are {len(mask)} masks"
         a_list: List = utils.array_to_clean_list(a)
-        print("a", [i.shape for i in a_list])
-        print("m", [i.shape for i in mask])
         a_list = [i[..., m] for i, m in zip(a_list, mask)]
         return utils.equalize_list_to_array(a_list)
 
@@ -124,7 +122,6 @@ class Labeler(TransformerMixin, BaseEstimator):
         mask_list: List = [i[1] for i in filtered_labels]
         self._y_lengths = [i.shape[-1] for i in y_hat_list]
         self._y_hat = utils.equalize_list_to_array(y_hat_list)
-        print("y shape", self._y_hat.shape)
         self._mask = mask_list
         return self
 

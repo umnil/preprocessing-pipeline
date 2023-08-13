@@ -58,7 +58,7 @@ class Windower(TransformerMixin, BaseEstimator):
         self.trial_size: int = trial_size
         self.label_scheme: int = label_scheme
         self._window_packets: np.ndarray = np.array([])
-        self.axis: Union[int, List[int]] = axis
+        self.axis: int = axis
 
         # Uninitialized variables to be defined later
         self._n: int
@@ -81,9 +81,8 @@ class Windower(TransformerMixin, BaseEstimator):
         np.ndarray
             an Wx1 input array were W is the number of windows
         """
-        t_axis: int = self.axis if isinstance(self.axis, int) else self.axis[0]
-        self._n = y.shape[t_axis]
-        y, win_idxs = self._window_transform(y, t_axis, True)
+        self._n = y.shape[self.axis]
+        y, win_idxs = self._window_transform(y, self.axis, True)
         self._window_idxs = win_idxs
 
         # Apply labelling scheme
@@ -201,9 +200,10 @@ class Windower(TransformerMixin, BaseEstimator):
         expected_n_windows: int = int(
             (t - self.samples_per_window) / self.window_step + 1
         )
-        assert (
-            a.shape[0] == expected_n_windows
-        ), f"Failed to window the data. Expected {expected_n_windows}, but got {a.shape[0]}"
+        assert a.shape[0] == expected_n_windows, (
+            "Failed to window the data."
+            f"Expected {expected_n_windows}, but got {a.shape[0]}"
+        )
         assert a.shape[-1] == self.samples_per_window
 
         # replace time axis. Shape should now be (... n_windows, n_time)
@@ -265,7 +265,7 @@ class Windower(TransformerMixin, BaseEstimator):
                 flatten_x: np.ndarray = np.moveaxis(x, self.axis - 1, 1)
                 flatten_x = flatten_x.reshape(-1, *flatten_x.shape[self.axis - 1 :])
 
-                y = self._window_transform(self._y, self.axis)
+                y, _ = self._window_transform(self._y, self.axis, True)
                 t: int = x.shape[self.axis]
                 flatten_y: np.ndarray = y.reshape(-1, t)
 
