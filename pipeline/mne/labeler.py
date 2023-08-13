@@ -18,7 +18,6 @@ class Labeler(TransformerMixin, BaseEstimator):
         self,
         labels: Optional[List] = None,
         channels: Optional[List] = None,
-        concatenate: bool = True,
     ):
         """Initialize a labeler that will search for the labels specified in
         `labels`
@@ -30,13 +29,9 @@ class Labeler(TransformerMixin, BaseEstimator):
             `None` to the list.
         channels : Optional[List]
             Channels to pick
-        concatenate : bool
-            When transform is passed a list of Raws, if `concatenate` is set to
-            `False`, the transform will return a 3 dimensional matrix
         """
         self.labels: Optional[List[str]] = labels
         self.channels: Optional[List[int]] = channels
-        self.concatenate: bool = concatenate
         self._x_hat: np.ndarray = np.empty([])
         self._y_hat: np.ndarray = np.empty([])
         self._x_lengths: List[int] = []
@@ -63,8 +58,10 @@ class Labeler(TransformerMixin, BaseEstimator):
             mask
         ), f"a has shape {a.shape} and there are {len(mask)} masks"
         a_list: List = utils.array_to_clean_list(a)
-        a_list = [i[m] for i, m in zip(a_list, mask)]
-        return utils.equalize_list_to_array(a_list, axis=0)
+        print("a", [i.shape for i in a_list])
+        print("m", [i.shape for i in mask])
+        a_list = [i[..., m] for i, m in zip(a_list, mask)]
+        return utils.equalize_list_to_array(a_list)
 
     def filter_labels(self, y_labels: List[str]) -> Tuple[np.ndarray, np.ndarray]:
         """Given a list of string labels obtained from mne annotations convert
@@ -119,19 +116,16 @@ class Labeler(TransformerMixin, BaseEstimator):
         Labeler
             self
         """
-        if isinstance(x, List):
-            filtered_labels: List = [self.filter_labels(self.load_labels(i)) for i in x]
-            y_hat_list: List = [i[0] for i in filtered_labels]
-            mask_list: List = [i[1] for i in filtered_labels]
-            self._y_lengths = [i.shape[-1] for i in y_hat_list]
-            self._y_hat = utils.equalize_list_to_array(y_hat_list)
-            self._mask = mask_list
-            if self.concatenate:
-                self._y_hat = np.concatenate(y_hat_list)
-        else:
-            self._y_hat, mask = self.filter_labels(self.load_labels(x))
-            self._mask = cast(List, mask)
-            self._y_lengths = [self._y_hat.shape[-1]]
+        if not isinstance(x, List):
+            x = [x]
+
+        filtered_labels: List = [self.filter_labels(self.load_labels(i)) for i in x]
+        y_hat_list: List = [i[0] for i in filtered_labels]
+        mask_list: List = [i[1] for i in filtered_labels]
+        self._y_lengths = [i.shape[-1] for i in y_hat_list]
+        self._y_hat = utils.equalize_list_to_array(y_hat_list)
+        print("y shape", self._y_hat.shape)
+        self._mask = mask_list
         return self
 
     @staticmethod
@@ -184,30 +178,18 @@ class Labeler(TransformerMixin, BaseEstimator):
             Shape of (time, channels, 1)
         """
         data: np.ndarray
-        if isinstance(x, List):
-            data_list: List[np.ndarray] = []
-            for i in x:
-                i = i.copy() if self.channels is None else i.copy().pick(self.channels)
-                data = i.get_data()
-                data = np.moveaxis(np.expand_dims(data, -1), 0, 1)
-                data_list.append(data)
+        if not isinstance(x, List):
+            x = [x]
 
-            self._x_hat = utils.equalize_list_to_array(data_list, axis=0)
-            self._x_hat = self.apply_mask(self._x_hat, self._mask)
+        data_list: List[np.ndarray] = []
+        for i in x:
+            i = i.copy() if self.channels is None else i.copy().pick(self.channels)
+            data = i.get_data()
+            data_list.append(data)
 
-            if self.concatenate:
-                self._x_hat = np.concatenate(self._x_hat)
-                non_nan_idxs: np.bool_ = ~(np.isnan(self._x_hat)[:, 0].squeeze())
-                self._x_hat = self._x_hat[non_nan_idxs]
-
-            self._x_lengths = [i.shape[0] for i in data_list]
-        else:
-            x = x.copy() if self.channels is None else x.copy().pick(self.channels)
-            data = x.get_data()
-            self._x_hat = np.moveaxis(  # size = (time, channels, 1)
-                np.expand_dims(data, -1), 0, 1
-            )
-            self._x_hat = self._x_hat[self._mask]
+        self._x_hat = utils.equalize_list_to_array(data_list)
+        self._x_hat = self.apply_mask(self._x_hat, self._mask)
+        self._x_lengths = [i.shape[0] for i in data_list]
 
         return self._x_hat
 

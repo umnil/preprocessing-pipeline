@@ -2,13 +2,16 @@ import numpy as np
 from typing import List, Tuple
 
 
-def array_to_clean_list(a: np.ndarray) -> List:
+def array_to_clean_list(a: np.ndarray, axis=-1) -> List:
     """Given an array `a` that may or may not have been created using
     `equalize_list_to_array` convert to a list of arrays and remove any NaN
     Padding
     """
     masked_array: np.ma.core.MaskedArray = np.ma.masked_invalid(a)
-    return [i.data[(~i.mask[:, 0]).squeeze()] for i in masked_array]
+    masked_list: List = [np.moveaxis(i, axis, 0) for i in masked_array]
+    unmasked_lists = [i.data[~i.mask[:, 0].squeeze()] for i in masked_list]
+    unmasked_lists = [np.moveaxis(i, 0, axis) for i in unmasked_lists]
+    return unmasked_lists
 
 
 def equalize_list_to_array(a: List[np.ndarray], axis: int = -1) -> np.ndarray:

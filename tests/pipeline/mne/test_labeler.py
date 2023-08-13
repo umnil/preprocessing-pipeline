@@ -156,24 +156,14 @@ def test_labeler_fit() -> None:
     raw: RawArray = create_mock_raw()
     labeler: Labeler = Labeler(labels=["label_1", "label_2"])
     labeler.fit(raw)
-    assert labeler._y_hat.size == 3000
+    assert labeler._y_hat.shape == (1, 3000)
     assert labeler._y_lengths == [3000]
 
     # Test fit with a list of mne.Raw objects
     raw_list = [create_mock_raw(), create_mock_raw()]
     labeler = Labeler(labels=["label_1", "label_2"])
     labeler.fit(raw_list)
-    assert labeler._y_hat.size == 6000
-    assert labeler._y_hat.ndim == 1
-    assert labeler._y_lengths == [3000, 3000]
-
-    # Test fit with list and don't concatenate
-    raw_list = [create_mock_raw(), create_mock_raw()]
-    labeler = Labeler(labels=["label_1", "label_2"], concatenate=False)
-    labeler.fit(raw_list)
-    assert labeler._y_hat.size == 6000
-    assert labeler._y_hat.ndim == 2
-    assert labeler._y_hat.shape[0] == 2
+    assert labeler._y_hat.shape == (2, 3000)
     assert labeler._y_lengths == [3000, 3000]
 
     # Non Uniform
@@ -181,24 +171,14 @@ def test_labeler_fit() -> None:
     raw = create_mock_raw(False)
     labeler = Labeler(labels=["label_1", "label_2"])
     labeler.fit(raw)
-    assert labeler._y_hat.size == 500 + 750 + 1250
+    assert labeler._y_hat.shape == (1, 2500)
     assert labeler._y_lengths == [2500]
 
     # Test fit with a list of mne.Raw objects
     raw_list = [create_mock_raw(False), create_mock_raw(False)]
     labeler = Labeler(labels=["label_1", "label_2"])
     labeler.fit(raw_list)
-    assert labeler._y_hat.size == 5000
-    assert labeler._y_hat.ndim == 1
-    assert labeler._y_lengths == [2500, 2500]
-
-    # Test fit with list and don't concatenate
-    raw_list = [create_mock_raw(False), create_mock_raw(False)]
-    labeler = Labeler(labels=["label_1", "label_2"], concatenate=False)
-    labeler.fit(raw_list)
-    assert labeler._y_hat.size == 5000
-    assert labeler._y_hat.ndim == 2
-    assert labeler._y_hat.shape[0] == 2
+    assert labeler._y_hat.shape == (2, 2500)
     assert labeler._y_lengths == [2500, 2500]
 
 
@@ -207,82 +187,54 @@ def test_labeler_transform() -> None:
     raw: RawArray = create_mock_raw()
     labeler: Labeler = Labeler()
     x: np.ndarray = labeler.fit_transform(raw)
-    assert x.shape == (5000, 6, 1)
+    assert x.shape == (1, 6, 5000)
 
     # Test transform with a single mne.Raw object
     raw = create_mock_raw()
     labeler = Labeler(labels=["label_1", "label_2"])
     x = labeler.fit_transform(raw)
-    assert x.shape == (3000, 6, 1)
+    assert x.shape == (1, 6, 3000)
 
     # Test transform with a list of mne.Raw objects
     raw_list = [create_mock_raw(), create_mock_raw()]
     labeler = Labeler(labels=["label_1", "label_2"])
     x = labeler.fit_transform(raw_list)
-    assert labeler._y_hat.shape == (6000,)
-    assert x.shape == (6000, 6, 1)
-
-    # Test transform with no concatenation
-    raw_list = [create_mock_raw(), create_mock_raw()]
-    labeler = Labeler(labels=["label_1", "label_2"], concatenate=False)
-    x = labeler.fit_transform(raw_list)
-    assert x.shape == (2, 3000, 6, 1)
+    assert labeler._y_hat.shape == (2, 3000)
+    assert x.shape == (2, 6, 3000)
 
     # Non-Uniform
     # Test transform with a single mne.Raw object
     raw = create_mock_raw(False)
     labeler = Labeler()
     x = labeler.fit_transform(raw)
-    assert x.shape == (5000, 6, 1)
+    assert x.shape == (1, 6, 5000)
 
     # Test transform with a single mne.Raw object
     raw = create_mock_raw(False)
     labeler = Labeler(labels=["label_1", "label_2"])
     x = labeler.fit_transform(raw)
-    assert x.shape == (2500, 6, 1)
+    assert x.shape == (1, 6, 2500)
 
     # Test transform with a list of mne.Raw objects
     raw_list = [create_mock_raw(False), create_mock_raw(False)]
     labeler = Labeler(labels=["label_1", "label_2"])
     x = labeler.fit_transform(raw_list)
-    assert labeler._y_hat.shape == (5000,)
-    assert x.shape == (5000, 6, 1)
-
-    # Test transform with no concatenation
-    raw_list = [create_mock_raw(False), create_mock_raw(False)]
-    labeler = Labeler(labels=["label_1", "label_2"], concatenate=False)
-    x = labeler.fit_transform(raw_list)
-    assert x.shape == (2, 2500, 6, 1)
+    assert labeler._y_hat.shape == (2, 2500)
+    assert x.shape == (2, 6, 2500)
 
     # Test transform with a list of mne.Raw objects with different event timing
     raw_list = [create_mock_raw(False), create_mock_raw(False, 1)]
     labeler = Labeler(labels=["label_1", "label_2"])
     x = labeler.fit_transform(raw_list)
-    assert labeler._y_hat.shape == (6000,)
-    assert x.shape == (6000, 6, 1)
+    assert labeler._y_hat.shape == (2, 3500)
+    assert x.shape == (2, 6, 3500)
 
     # Test transform with different event timing and no concatenation
-    raw_list = [create_mock_raw(False), create_mock_raw(False, 1)]
-    labeler = Labeler(labels=["label_1", "label_2"], concatenate=False)
-    x = labeler.fit_transform(raw_list)
-    y = labeler._y_hat
-    assert x.shape == (2, 3500, 6, 1)
-    assert x.shape[:2] == y.shape
-
     # Test transform with a list of mne.Raw objects with different event timing
     # and lengths
     raw_list = [create_mock_raw(False), create_mock_raw(False, 2)]
     labeler = Labeler(labels=["label_1", "label_2"])
     x = labeler.fit_transform(raw_list)
     y = labeler._y_hat
-    assert labeler._y_hat.shape == (6000,)
-    assert x.shape == (6000, 6, 1)
-    assert x.shape[0:1] == y.shape
-
-    # Test transform with different event timings andn lengths and no concatenation
-    raw_list = [create_mock_raw(False), create_mock_raw(False, 2)]
-    labeler = Labeler(labels=["label_1", "label_2"], concatenate=False)
-    x = labeler.fit_transform(raw_list)
-    y = labeler._y_hat
-    assert x.shape == (2, 3500, 6, 1)
-    assert x.shape[:2] == y.shape
+    assert labeler._y_hat.shape == (2, 3500)
+    assert x.shape == (2, 6, 3500)
