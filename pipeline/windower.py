@@ -19,7 +19,7 @@ class Windower(TransformerMixin, BaseEstimator):
         label_scheme: int = 0,
         window_step: int = 80,
         trial_size: int = 60000,
-        axis: Union[int, List[int]] = 0,
+        axis: int = -1,
     ):
         """
 
@@ -50,10 +50,8 @@ class Windower(TransformerMixin, BaseEstimator):
             divided prior to windowing. This is the number of packets expected
             per trial
             Ignored if `label_scheme == 4`
-        axis : Union[int, List[int]]
-            The dimension across which to perform windowing. If a list of axes
-            is provided, this transformer functions as a re-windowing function,
-            in which the axes in the list are remerged and windowed over.
+        axis : int
+            The dimension across which to perform windowing.
         """
         self.samples_per_window: int = samples_per_window
         self.window_step: int = window_step
@@ -208,7 +206,7 @@ class Windower(TransformerMixin, BaseEstimator):
         ), f"Failed to window the data. Expected {expected_n_windows}, but got {a.shape[0]}"
         assert a.shape[-1] == self.samples_per_window
 
-        # replace time axis. Shape should now be (... n_windows, ..., n_time)
+        # replace time axis. Shape should now be (... n_windows, n_time)
         a = np.moveaxis(a, 0, axis)
         return a if not return_indices else (a, window_idxs)
 
@@ -253,48 +251,43 @@ class Windower(TransformerMixin, BaseEstimator):
         # place all time axes in the back and all other axes up front
         # Flatten the back so that time is linear across all other axes
         dim_list: np.ndarray = np.arange(x.ndim)
-        if isinstance(self.axis, int):
-            x = np.moveaxis(x, self.axis, -1)
-            x = x.reshape(*x.shape[:-1], -1)
-            dim_list[[-1, self.axis]] = dim_list[[self.axis, -1]]
-        elif isinstance(self.axis, list):
-            x = np.moveaxis(x, self.axis, range(-len(self.axis), 0))
-            x = x.reshape(*x.shape[: -len(self.axis)], -1)
-            dim_list[[np.arange(-len(self.axis), 0), self.axis]] = dim_list[
-                [self.axis, np.arange(-len(self.axis), 0)]  # type: ignore
-            ]
+        x = np.moveaxis(x, self.axis, -1)
+        x = x.reshape(*x.shape[:-1], -1)
+        dim_list[[-1, self.axis]] = dim_list[[self.axis, -1]]
 
         if self.label_scheme < 4:
             x = cast(np.ndarray, self._window_transform(x))
             x = np.moveaxis(x, dim_list, np.arange(dim_list.size)).squeeze()
             if self.label_scheme == 3:
                 # Remove windows with mixed labelling
-                t_axis: int = self.axis if isinstance(self.axis, int) else self.axis[0]
-                y, win_idxs = self._window_transform(self._y, t_axis, True)
-                n_axis: int = 1 if isinstance(self.axis, int) else len(self.axis)
-                flatten_y: np.ndarray = y.reshape(-1, *y.shape[n_axis:])
-                flatten_x: np.ndarray = x.reshape(-1, *x.shape[n_axis:])
+                # Temporarily merge the windowing and n axis
+
+                flatten_x: np.ndarray = np.moveaxis(x, self.axis - 1, 1)
+                flatten_x = flatten_x.reshape(-1, *flatten_x.shape[self.axis - 1 :])
+
+                y = self._window_transform(self._y, self.axis)
+                t: int = x.shape[self.axis]
+                flatten_y: np.ndarray = y.reshape(-1, t)
+
                 flatten_x = np.array(
                     [i for i, j in zip(flatten_x, flatten_y) if len(set(j)) == 1]
                 )
-                if n_axis > 1:
-                    x = flatten_x.reshape(x.shape[0], -1, *x.shape[2:])
-                else:
-                    x = flatten_x
+
+                # Reseparate the n and windowing axes
+                reshaped_x: np.ndarray = flatten_x.reshape(
+                    x.shape[0], -1, *flatten_x.shape[self.axis - 1 :]
+                )
+                x = np.moveaxis(reshaped_x, 1, self.axis - 1)
         else:
             y = self._y
-            if y.ndim > 1:
-                idxs = [self._window_by_label(i, True)[1] for i in y]
-                print(type(idxs[0]))
-                x = np.array(
-                    [
-                        utils.equalize_list_to_array([a[..., i] for i in idx])
-                        for a, idx in zip(x, idxs)
-                    ]
-                )
-            else:
-                _, idxs = self._window_by_label(self._y, True)
-                x = utils.equalize_list_to_array([x[..., i] for i in idxs]).squeeze()
+            idxs = [self._window_by_label(i, True)[1] for i in y]
+            x = np.array(
+                [
+                    utils.equalize_list_to_array([a[..., i] for i in idx])
+                    for a, idx in zip(x, idxs)
+                ]
+            )
+            x = np.moveaxis(x, 1, self.axis - 1)
 
         self._x = x
 
