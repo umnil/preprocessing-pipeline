@@ -1,10 +1,12 @@
 import numpy as np
 from pipeline.windower import Windower
-from typing import cast, Tuple
+from typing import List, Tuple, cast
 
 
 # Create mock data for testing
-def create_mock_data(uniform=True) -> Tuple[np.ndarray, np.ndarray]:
+def create_mock_data(
+    uniform=True, different_shapes=False
+) -> Tuple[np.ndarray, np.ndarray]:
     # Create mock data with the desired shape for windowing
     # shape (3, 10, 5000)
     sfreq: int = 1000
@@ -13,14 +15,35 @@ def create_mock_data(uniform=True) -> Tuple[np.ndarray, np.ndarray]:
     n_channels: int = 10
     n: int = 3
     data: np.ndarray = np.random.randn(n, n_channels, n_timepoints)
-    labels: np.ndarray = np.array([[0, 1, 2, 3, 1]] * 1000).T.flatten() * np.array(
-        [[1]] * 3
-    )
+    label_order: List = [0, 1, 2, 3, 1]
+    label_times: List = [1000] * len(label_order)
+    labels = make_labels(label_order, label_times)
+    labels = np.vstack([labels] * n)
     if not uniform:
-        labels = np.array(
-            [0] * 1000 + [1] * 500 + [2] * 750 + [3] * 1500 + [1] * 1250
-        ) * np.array([[1]] * 3)
+        label_times = [1000, 500, 750, 1500, 1250]
+        labels = np.hstack([[label] * t for label, t in zip(label_order, label_times)])
+        labels = np.vstack([labels] * n)
+
+    if different_shapes:
+        label_order = [[0, 1, 2, 3, 1], [1, 2, 4], [3, 2, 1, 0]]
+        label_times = [
+            [1000, 500, 750, 1500, 1250],
+            [1750, 1625, 1625],
+            [500, 2000, 750, 1750],
+        ]
+        labels = np.vstack(
+            [
+                make_labels(orders, times)
+                for orders, times in zip(label_order, label_times)
+            ]
+        )
+
     return data, labels
+
+
+# Create mod labels
+def make_labels(order: List, times: List) -> np.ndarray:
+    return np.hstack([[label] * time for label, time in zip(order, times)])
 
 
 # Test the Windower class
@@ -119,3 +142,9 @@ class TestWindower:
         windower = Windower(samples_per_window=500, label_scheme=4, window_step=250)
         x = windower.fit_transform(data, labels)
         assert x.shape == (3, 10, 5, 1500)
+
+        data, labels = create_mock_data(uniform=False, different_shapes=True)
+        windower = Windower(samples_per_window=500, label_scheme=4, window_step=250)
+        x = windower.fit_transform(data, labels)
+        assert x.shape == (3, 10, 5, 2000)
+        assert windower._y_lengths == [5, 3, 4]

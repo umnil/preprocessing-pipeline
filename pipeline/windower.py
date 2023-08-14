@@ -108,12 +108,9 @@ class Windower(TransformerMixin, BaseEstimator):
         elif self.label_scheme == 4:
             # Windows by labels
             y = self._y
-            if y.ndim > 1:
-                y = utils.equalize_list_to_array(
-                    [cast(np.ndarray, self._window_by_label(i)) for i in y]
-                )
-            else:
-                y = cast(np.ndarray, self._window_by_label(y))
+            y = utils.equalize_list_to_array(
+                [cast(np.ndarray, self._window_by_label(i)) for i in y]
+            )
             y_transformed = y
 
         self._n_windows = y_transformed.shape[0]
@@ -211,18 +208,18 @@ class Windower(TransformerMixin, BaseEstimator):
         return a if not return_indices else (a, window_idxs)
 
     def fit(self, x: np.ndarray, y: np.ndarray, **fit_params) -> "Windower":
-        """Uses the data given to determine appropriate window indicies and
-        labelling. When running, transform is expected to be passed the same X
-        array, otherwise the behavior is undefined
+        """Given an n-dimensional matrix `x`, the time-dimension, indicated by
+        `axis`, is windowed over creating a new dimension (i.e., from time ->
+        windows, time). The way the windows are labelled is determined by the
+        selected `label_scheme`
 
         Parameters
         ----------
         X : np.ndarray
-            An NxCxT matrix array of data were N is the number of epochs and C
-            is the number of channels and T is the number of data points per
-            epoch.
+            An matrix array of data with a time dimension
         y : np.ndarray
-            An Nx1 matrix array that contains the corresponding labels for X
+            An NxM matrix array that contains the corresponding labels for X.
+            The size of the first dimension must match X.
 
         Retunrs
         -------
@@ -232,6 +229,10 @@ class Windower(TransformerMixin, BaseEstimator):
         self._t = np.prod(np.array(x.shape)[self.axis])
         self._y = y
         self._y_hat = self._make_labels(y)
+        print("y_hat", self._y_hat.shape)
+        self._y_lengths = [
+            i.data[~i.mask].shape[0] for i in np.ma.masked_invalid(self._y_hat)
+        ]
         return self
 
     def transform(self, x: np.ndarray) -> np.ndarray:
@@ -280,12 +281,10 @@ class Windower(TransformerMixin, BaseEstimator):
         else:
             y = self._y
             idxs = [self._window_by_label(i, True)[1] for i in y]
-            x = np.array(
-                [
-                    utils.equalize_list_to_array([a[..., i] for i in idx])
-                    for a, idx in zip(x, idxs)
-                ]
-            )
+            # Apply windows
+            x_win = [[a[..., i] for i in idx] for a, idx in zip(x, idxs)]
+            x_time = [utils.equalize_list_to_array(a) for a in x_win]
+            x = utils.equalize_list_to_array(x_time, axes=[0, -1])
             x = np.moveaxis(x, 1, self.axis - 1)
 
         self._x = x
