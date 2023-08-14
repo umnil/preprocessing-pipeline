@@ -76,6 +76,11 @@ class TestWindower:
         assert y.shape == (3, 5)
 
     def test_transform(self) -> None:
+        data, labels = create_mock_data()
+        windower = Windower(samples_per_window=500, window_step=250)
+        x = windower.fit_transform(data[0:1], labels[0:1])
+        assert x.shape == (1, 10, 19, 500)
+
         # Unconcatenated 0
         data, labels = create_mock_data()
         windower = Windower(samples_per_window=500, window_step=250)

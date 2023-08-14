@@ -257,11 +257,10 @@ class Windower(TransformerMixin, BaseEstimator):
 
         if self.label_scheme < 4:
             x = cast(np.ndarray, self._window_transform(x))
-            x = np.moveaxis(x, dim_list, np.arange(dim_list.size)).squeeze()
+            x = np.moveaxis(x, dim_list, np.arange(dim_list.size))
             if self.label_scheme == 3:
                 # Remove windows with mixed labelling
                 # Temporarily merge the windowing and n axis
-
                 flatten_x: np.ndarray = np.moveaxis(x, self.axis - 1, 1)
                 flatten_x = flatten_x.reshape(-1, *flatten_x.shape[self.axis - 1 :])
 
