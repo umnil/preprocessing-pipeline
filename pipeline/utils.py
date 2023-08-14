@@ -14,7 +14,7 @@ def array_to_clean_list(a: np.ndarray, axis=-1) -> List:
     return unmasked_lists
 
 
-def equalize_list_to_array(a: List[np.ndarray], axis: int = -1) -> np.ndarray:
+def equalize_list_to_array(a: List[np.ndarray], axes: List[int] = [-1]) -> np.ndarray:
     """Given a list of ragged numpy arrays, this function fills the missing
     data with NaN to return an array with squre dimensions
 
@@ -22,19 +22,19 @@ def equalize_list_to_array(a: List[np.ndarray], axis: int = -1) -> np.ndarray:
     ----------
     a : List
         The list of other numpy arrays
-    axis : int
-        The axis within the arrays along which NaNs are filled
+    axes : List[int]
+        The axes within the arrays along which NaNs are filled
 
     Return
     ------
     np.ndarray
         The filled and stacked array
     """
-    max_len: int = max([i.shape[axis] for i in a])
+    max_lens: List[int] = [max([i.shape[axis] for i in a]) for axis in axes]
     a = [
         np.pad(
             i.astype(np.float32),
-            generate_padding_param(i, max_len, axis),
+            generate_padding_param(i, max_lens, axes),
             "constant",
             constant_values=np.nan,
         )
@@ -75,18 +75,26 @@ def equalize_shape(a: np.ndarray, axis: int = -1) -> np.ndarray:
     return a
 
 
-def generate_padding_param(a: np.ndarray, max_len: int, axis: int = -1) -> List:
+def generate_padding_param(
+    a: np.ndarray, max_lens: List[int], axes: List = [-1]
+) -> List:
     """Create a set of tuples for use in np.pad
 
     Parameters
     ----------
     a : np.ndarray
         The array to check the shape of
-    max_len : int
-        Maximum expected length
-    axis : int
-        The axis along which to create padding
+    max_lens : List[int]
+        Maximum expected lengths for each axis provided
+    axes : List
+        List of axes to pad
     """
-    axis = axis if axis >= 0 else (a.ndim + axis)
-    assert axis >= 0
-    return [[0, max_len - a.shape[axis] if i == axis else 0] for i in range(a.ndim)]
+    axes = [i if i >= 0 else (a.ndim + i) for i in axes]
+    assert np.array([a >= 0 for a in axes]).all()
+
+    # Populate lens
+    lens = [0] * a.ndim
+    for i, axis in enumerate(axes):
+        lens[axis] = max_lens[i] - a.shape[axis]
+
+    return [[0, len] for i, len in enumerate(lens)]

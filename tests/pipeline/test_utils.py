@@ -9,9 +9,17 @@ from pipeline.utils import (
 # Test the generate_padding_param function
 def test_generate_padding_param():
     a = [np.array([1, 2, 3]), np.array([4, 5])]
-    max_len = 4
-    padding_params = generate_padding_param(a[0], max_len, axis=-1)
+    max_lens = [4]
+    padding_params = generate_padding_param(a[0], max_lens)
     assert padding_params == [[0, 1]]
+
+    a = [
+        np.array([[1, 2, 3, 4], [1, 2, 3, 4]]),  # Shape (2, 4)
+        np.array([[1, 2, 3], [1, 2, 3], [1, 2, 3]]),  # shape (3, 3)
+    ]
+    max_lens = [3, 4]
+    padding_params = generate_padding_param(a[0], max_lens, axes=[0, 1])
+    assert padding_params == [[0, 1], [0, 0]]
 
 
 # Test the equalize_list_to_array function
