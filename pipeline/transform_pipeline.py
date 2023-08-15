@@ -60,6 +60,8 @@ class TransformPipeline(Pipeline):
             # transformer. This is necessary when loading the transformer
             # from the cache.
             self.steps[step_idx] = (name, fitted_transformer)
+            if hasattr(fitted_transformer, "_y_lengths"):
+                self._y_lengths = getattr(fitted_transformer, "_y_lengths")
         return X, y
 
     def fit(self, X: np.ndarray, y: Optional[np.ndarray] = None, **fit_params):
@@ -214,10 +216,10 @@ class TransformPipeline(Pipeline):
             X_hat, y_hat = self._step_transform(step, X, y, debug)
 
             # Check for nan
-            if np.isnan(y_hat.astype(np.float64)).any():
-                nan_mask = np.isnan(y_hat)
-                X_hat = X_hat[~nan_mask]
-                y_hat = y_hat[~nan_mask]
+            # if np.isnan(y_hat.astype(np.float64)).any():
+            # nan_mask = np.isnan(y_hat)
+            # X_hat = X_hat[~nan_mask]
+            # y_hat = y_hat[~nan_mask]
 
             # Validation
             assert X_hat.shape[0] == y_hat.shape[0], (
@@ -303,10 +305,10 @@ def _fit_transform_one(
             )
 
         # Check for nan
-        if np.isnan(res_y.astype(np.float64)).any():
-            nan_mask = np.isnan(res_y)
-            res_x = res_x[~nan_mask]
-            res_y = res_y[~nan_mask]
+        # if np.isnan(res_y.astype(np.float64)).any():
+        # nan_mask = np.isnan(res_y)
+        # res_x = res_x[~nan_mask]
+        # res_y = res_y[~nan_mask]
 
     if weight is None:
         return res_x, res_y, transformer

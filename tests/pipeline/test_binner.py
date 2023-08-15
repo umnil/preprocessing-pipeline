@@ -11,7 +11,7 @@ from typing import List
 
 
 class TestBinner:
-    def test_binner(self):
+    def test_binner(self) -> None:
         pipeline_dir: str = os.path.dirname(__file__)
         test_dir: str = os.path.join(pipeline_dir, "..")
         data_dir: str = os.path.join(test_dir, "data")

@@ -1,5 +1,6 @@
 import mne  # type: ignore
 import numpy as np
+from mne import Epochs  # type: ignore
 from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
 from typing import List, Optional, cast
 
@@ -13,7 +14,7 @@ class PSDBinner(TransformerMixin, BaseEstimator):
     def __init__(
         self,
         bins: List[List],
-        raw: Optional[mne.Epochs] = None,
+        raw: Optional[Epochs] = None,
         sfreq: Optional[int] = None,
         slen: Optional[int] = None,
         freqs: Optional[np.ndarray] = None,
@@ -53,7 +54,7 @@ class PSDBinner(TransformerMixin, BaseEstimator):
             fmin, sfreq)
         """
         self.bins: List[List] = bins
-        self._raw: Optional[mne.Epochs] = raw
+        self._raw: Optional[Epochs] = raw
         self.sfreq: Optional[int] = sfreq
         self._slen: Optional[int] = slen
         self.freqs: np.ndarray
@@ -221,11 +222,11 @@ class PSDBinner(TransformerMixin, BaseEstimator):
         )
 
     @property
-    def raw(self) -> Optional[mne.Epochs]:
+    def raw(self) -> Optional[Epochs]:
         return self._raw
 
     @raw.setter
-    def raw(self, r: mne.Epochs):
+    def raw(self, r: Epochs):
         self._raw = r
         psds, freqs = mne.time_frequency.psd_multitaper(self._raw.copy())
         self.freqs = freqs

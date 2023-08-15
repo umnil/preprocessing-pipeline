@@ -9,7 +9,6 @@ from pipeline.inline.filter import Filterer
 
 
 class TestFilterer:
-
     pipeline_dir: str = os.path.dirname(__file__)
     test_dir: str = os.path.join(pipeline_dir, "..")
     data_dir: str = os.path.join(test_dir, "data")
@@ -18,7 +17,7 @@ class TestFilterer:
     artifact_file_name: str = "artifact.p"
     artifact_file_path: str = os.path.join(data_dir, artifact_file_name)
 
-    def test_fit_transform(self):
+    def test_fit_transform(self) -> None:
         data: pd.DataFrame = pd.read_pickle(self.data_file_path)
         e: Extractor = Extractor()
         X: np.ndarray = e.fit_transform(data)
@@ -62,7 +61,7 @@ class TestFilterer:
         X = f.fit_transform(X, y)
         assert f._y_hat is not None
 
-    def test__detect_channel_artifacts(self):
+    def test__detect_channel_artifacts(self) -> None:
         data: pd.DataFrame = pd.read_pickle(self.artifact_file_path)
         X: np.ndarray = data
         y: np.ndarray = data["prompt"].values
