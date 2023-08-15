@@ -101,16 +101,14 @@ class Windower(TransformerMixin, BaseEstimator):
             y_transformed = y.squeeze()
         elif self.label_scheme == 3:
             # Non-ambiguous
-            flattened_y = y.reshape(-1, self.samples_per_window)
-            flattened_y = np.array([i[0] for i in flattened_y if len(set(i)) < 2])
-            y = flattened_y if y.ndim < 3 else flattened_y.reshape(y.shape[0], -1)
+            y = utils.mask_list(
+                [[win[0] for win in inst if len(set(win)) < 2] for inst in y]
+            )
             y_transformed = y.squeeze()
         elif self.label_scheme == 4:
             # Windows by labels
             y = self._y
-            y = utils.equalize_list_to_array(
-                [cast(np.ndarray, self._window_by_label(i)) for i in y]
-            )
+            y = utils.mask_list([cast(np.ndarray, self._window_by_label(i)) for i in y])
             y_transformed = y
 
         self._n_windows = y_transformed.shape[0]
@@ -149,14 +147,17 @@ class Windower(TransformerMixin, BaseEstimator):
             np.arange(a, b) for a, b in zip(delta_idxs[:-1], delta_idxs[1:])
         ]
         labels_list: List = [labels[i] for i in window_list_idxs]
-        labels = utils.equalize_list_to_array(labels_list)
+        labels = utils.mask_list(labels_list)
         return labels[:, 0] if not return_indices else (labels[:, 0], window_list_idxs)
 
     def _window_transform(
         self, a: np.ndarray, axis: int = -1, return_indices: bool = False
     ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         """Performs a windowing transformation on an array across the given
-        axis
+        axis. Note that the resulting array will have `a.ndim + 1` number of
+        dimensions to account for the windows. So if `a` has a shape of (5, 10,
+        2000, 8), and the time axis is `axis=2`, the resulting shape will be
+        (5, 10, n_win, n_time, 8).
 
         Parameters
         ----------
@@ -226,11 +227,16 @@ class Windower(TransformerMixin, BaseEstimator):
         Windower
             The current instance of the windowing object
         """
+        assert y.ndim > 1, "y labels must be at least two dimensions"
+        assert x.ndim > 1, "x labels must be at least two dimensions"
         self._t = np.prod(np.array(x.shape)[self.axis])
         self._y = y
         self._y_hat = self._make_labels(y)
         self._y_lengths = [
-            i.data[~i.mask].shape[0] for i in np.ma.masked_invalid(self._y_hat)
+            i.data[~i.mask].shape[0]
+            for i in np.ma.masked_invalid(
+                self._y_hat if self._y_hat.ndim > 1 else self._y_hat[None, ...]
+            )
         ]
         return self
 
@@ -259,24 +265,22 @@ class Windower(TransformerMixin, BaseEstimator):
             x = cast(np.ndarray, self._window_transform(x))
             x = np.moveaxis(x, dim_list, np.arange(dim_list.size))
             if self.label_scheme == 3:
-                # Remove windows with mixed labelling
-                # Temporarily merge the windowing and n axis
-                flatten_x: np.ndarray = np.moveaxis(x, self.axis - 1, 1)
-                flatten_x = flatten_x.reshape(-1, *flatten_x.shape[self.axis - 1 :])
+                # Calculate label transformation
+                y: np.ndarray = cast(
+                    np.ndarray, self._window_transform(self._y, self.axis)
+                )
 
-                y, _ = self._window_transform(self._y, self.axis, True)
-                t: int = x.shape[self.axis]
-                flatten_y: np.ndarray = y.reshape(-1, t)
-
-                flatten_x = np.array(
-                    [i for i, j in zip(flatten_x, flatten_y) if len(set(j)) == 1]
+                # Reshape to known axes (n, n_win, ...)
+                x = np.moveaxis(x, self.axis - 1, 1)
+                x = utils.mask_list(
+                    [
+                        [xwin for xwin, ywin in zip(xi, yi) if len(set(ywin)) < 2]
+                        for xi, yi in zip(x, y)
+                    ]
                 )
 
                 # Reseparate the n and windowing axes
-                reshaped_x: np.ndarray = flatten_x.reshape(
-                    x.shape[0], -1, *flatten_x.shape[self.axis - 1 :]
-                )
-                x = np.moveaxis(reshaped_x, 1, self.axis - 1)
+                x = np.moveaxis(x, 1, self.axis - 1)
         else:
             y = self._y
             idxs = [self._window_by_label(i, True)[1] for i in y]

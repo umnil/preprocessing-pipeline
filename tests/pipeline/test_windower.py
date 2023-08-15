@@ -144,6 +144,10 @@ class TestWindower:
         assert x.shape == (3, 10, 5, 1500)
 
         data, labels = create_mock_data(uniform=False, different_shapes=True)
+        windower = Windower(samples_per_window=500, label_scheme=3, window_step=250)
+        x = windower.fit_transform(data, labels)
+        assert x.shape == (3, 10, 16, 500)
+
         windower = Windower(samples_per_window=500, label_scheme=4, window_step=250)
         x = windower.fit_transform(data, labels)
         assert x.shape == (3, 10, 5, 2000)
