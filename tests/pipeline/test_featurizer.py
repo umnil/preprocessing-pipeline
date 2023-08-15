@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd  # type: ignore
 
-from typing import Dict
+from typing import Dict, Tuple
 from scipy.fft import fft, fftfreq  # type: ignore
 from pipeline.inline.extractor import Extractor
 from pipeline.inline.windower import Windower
@@ -10,7 +10,7 @@ from pipeline.inline.filter import Filterer
 from pipeline.inline.featurizer import Featurizer
 
 
-def fftfilt(data, *args, **kwargs):
+def fftfilt(data, *args, **kwargs) -> Tuple[np.ndarray, np.ndarray]:
     N = data.shape[1]
     T = 1.0 / 200.0
 
@@ -23,14 +23,13 @@ def fftfilt(data, *args, **kwargs):
 
 
 class TestFeaturizer:
-
     pipeline_dir: str = os.path.dirname(__file__)
     test_dir: str = os.path.join(pipeline_dir, "..")
     data_dir: str = os.path.join(test_dir, "data")
     data_file_name: str = "sample.p"
     data_file_path: str = os.path.join(data_dir, data_file_name)
 
-    def test_fit_transform(self):
+    def test_fit_transform(self) -> None:
         filter_args: Dict = {"sfreq": 200, "l_freq": 1, "h_freq": None}
         data: pd.DataFrame = pd.read_pickle(self.data_file_path)
         e: Extractor = Extractor()

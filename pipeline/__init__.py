@@ -1,6 +1,7 @@
 from . import inline
 from . import masked
 from . import mne
+from . import utils
 from .artifact_remover import ArtifactRemover
 from .extractor import Extractor
 from .feature_union import TransformFeatureUnion
@@ -27,6 +28,7 @@ Windower
 inline
 masked
 mne
+utils
 
 preprocessor = TransformPipeline(
     [

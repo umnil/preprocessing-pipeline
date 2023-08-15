@@ -5,7 +5,7 @@ from pipeline.ext import calc_wcs
 
 
 class TestExt:
-    def test_calc_wcs(self):
+    def test_calc_wcs(self) -> None:
         pipeline_dir: str = os.path.dirname(__file__)
         test_dir: str = os.path.join(pipeline_dir, "..")
         data_dir: str = os.path.join(test_dir, "data")
