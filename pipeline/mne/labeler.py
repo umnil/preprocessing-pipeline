@@ -38,29 +38,6 @@ class Labeler(TransformerMixin, BaseEstimator):
         self._y_lengths: List[int] = []
         self._mask: List = []
 
-    @staticmethod
-    def apply_mask(a: np.ndarray, mask: List) -> np.ndarray:
-        """Applies each mask in list to each row element in a
-
-        Parameters
-        ----------
-        a : np.ndarray
-            The input array
-        mask : List
-            A list of masks for each row component in a
-
-        Returns
-        -------
-        np.ndarray
-            `a` with data masked
-        """
-        assert a.shape[0] == len(
-            mask
-        ), f"a has shape {a.shape} and there are {len(mask)} masks"
-        a_list: List = utils.array_to_clean_list(a)
-        a_list = [i[..., m] for i, m in zip(a_list, mask)]
-        return utils.equalize_list_to_array(a_list)
-
     def filter_labels(self, y_labels: List[str]) -> Tuple[np.ndarray, np.ndarray]:
         """Given a list of string labels obtained from mne annotations convert
         these to numerical labels depending on whether they're provided to the
@@ -184,8 +161,8 @@ class Labeler(TransformerMixin, BaseEstimator):
             data = i.get_data()
             data_list.append(data)
 
-        self._x_hat = utils.equalize_list_to_array(data_list)
-        self._x_hat = self.apply_mask(self._x_hat, self._mask)
+        filtered_data: List = [i[..., m] for i, m in zip(data_list, self._mask)]
+        self._x_hat = utils.equalize_list_to_array(filtered_data)
         self._x_lengths = [i.shape[0] for i in data_list]
 
         return self._x_hat
