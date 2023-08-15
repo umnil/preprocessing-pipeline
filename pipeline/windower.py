@@ -229,7 +229,6 @@ class Windower(TransformerMixin, BaseEstimator):
         self._t = np.prod(np.array(x.shape)[self.axis])
         self._y = y
         self._y_hat = self._make_labels(y)
-        print("y_hat", self._y_hat.shape)
         self._y_lengths = [
             i.data[~i.mask].shape[0] for i in np.ma.masked_invalid(self._y_hat)
         ]
