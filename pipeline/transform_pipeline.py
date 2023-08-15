@@ -60,6 +60,8 @@ class TransformPipeline(Pipeline):
             # transformer. This is necessary when loading the transformer
             # from the cache.
             self.steps[step_idx] = (name, fitted_transformer)
+            if hasattr(fitted_transformer, "_y_lengths"):
+                self._y_lengths = getattr(fitted_transformer, "_y_lengths")
         return X, y
 
     def fit(self, X: np.ndarray, y: Optional[np.ndarray] = None, **fit_params):
