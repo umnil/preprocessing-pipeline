@@ -1,17 +1,5 @@
 import numpy as np
-from typing import List, Tuple
-
-
-def array_to_clean_list(a: np.ndarray, axis=-1) -> List:
-    """Given an array `a` that may or may not have been created using
-    `equalize_list_to_array` convert to a list of arrays and remove any NaN
-    Padding
-    """
-    masked_array: np.ma.core.MaskedArray = np.ma.masked_invalid(a)
-    masked_list: List = [np.moveaxis(i, axis, 0) for i in masked_array]
-    unmasked_lists = [i.data[~i.mask[:, 0].squeeze()] for i in masked_list]
-    unmasked_lists = [np.moveaxis(i, 0, axis) for i in unmasked_lists]
-    return unmasked_lists
+from typing import Iterable, List, Tuple
 
 
 def equalize_list_to_array(a: List[np.ndarray], axes: List[int] = [-1]) -> np.ndarray:
@@ -98,3 +86,38 @@ def generate_padding_param(
         lens[axis] = max_lens[i] - a.shape[axis]
 
     return [[0, len] for i, len in enumerate(lens)]
+
+
+def mask_list(input_list: List) -> np.ndarray:
+    contains_list: bool = True in [isinstance(li, Iterable) for li in input_list]
+    if contains_list:
+        array_list = [mask_list(i) for i in input_list]
+        n_dim = array_list[0].ndim
+        ret = equalize_list_to_array(array_list, axes=list(range(n_dim)))
+        return ret
+    else:
+        return np.array(input_list)
+
+
+def unmask_array(a: np.ndarray) -> List:
+    """Given an array `a` that may or may not have been created using
+    `equalize_list_to_array` convert to a list of arrays and remove any NaN
+    Padding
+    """
+    ma: np.ma.core.MaskedArray = np.ma.masked_invalid(a)
+    ma_list: List = ma.tolist()
+    return unmask_list(ma_list)
+
+
+def unmask_list(input_list: List) -> List:
+    result: List = []
+    for i in input_list:
+        if isinstance(i, list):
+            i = unmask_list(i)
+            if len(i) != 0:
+                result.append(i)
+        else:
+            if i is not None:
+                result.append(i)
+
+    return result
