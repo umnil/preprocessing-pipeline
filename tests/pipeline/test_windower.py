@@ -152,3 +152,9 @@ class TestWindower:
         x = windower.fit_transform(data, labels)
         assert x.shape == (3, 10, 5, 2000)
         assert windower._y_lengths == [5, 3, 4]
+
+    def test_novel_transform(self) -> None:
+        data, labels = create_mock_data(uniform=False)
+        windower = Windower(samples_per_window=500, window_step=250)
+        x = windower.transform(data, labels)
+        assert x.shape == (3, 10, 19, 500)
