@@ -25,5 +25,5 @@ def calc_wcs(df: pd.DataFrame) -> List:
     temp_pipeline: TransformPipeline = TransformPipeline(
         [("ex", Extractor()), ("wn", Windower(label_scheme=4))]
     )
-    temp_pipeline.transform(df, df["prompt"].values)
+    temp_pipeline.fit_transform(df, df["prompt"].values)
     return temp_pipeline.steps[-1][-1]._window_channel_size

@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd  # type: ignore
 
-from typing import List, Union, cast
+from typing import List, Optional, Sequence, Union, cast
 from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
 
 
@@ -34,7 +34,9 @@ class Extractor(TransformerMixin, BaseEstimator):
         """
         return self
 
-    def transform(self, X: Union[List, pd.DataFrame]) -> np.ndarray:
+    def transform(
+        self, X: Union[List, pd.DataFrame], y: Optional[Sequence] = None
+    ) -> np.ndarray:
         """transform an input of trial data in the form of a DataFrame into a
         time-series feature set
 

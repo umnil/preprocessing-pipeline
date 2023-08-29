@@ -1,10 +1,10 @@
 import pickle
 import numpy as np
 
-from typing import Tuple, IO, Dict, Any, List, Optional
+from typing import Dict, IO, Sequence, List, Optional, Tuple, cast
 from datetime import datetime
 
-from sklearn.base import clone  # type: ignore
+from sklearn.base import TransformerMixin, clone  # type: ignore
 from sklearn.pipeline import Pipeline  # type: ignore
 from sklearn.utils import _print_elapsed_time  # type: ignore
 from sklearn.utils.metaestimators import available_if  # type: ignore
@@ -24,9 +24,10 @@ def _final_estimator_has(attr):
 
 
 class TransformPipeline(Pipeline):
-    def _fit(self, X: np.ndarray, y: Optional[np.ndarray] = None, **fit_params_steps):
+    def _fit(self, X: Sequence, y: Optional[Sequence] = None, **fit_params_steps):
         # shallow copy of steps - this should really be steps_
         self.steps: List = list(self.steps)
+        self.results: List[Tuple] = []
         self._validate_steps()
         # Setup the memory
         memory = check_memory(self.memory)
@@ -46,6 +47,7 @@ class TransformPipeline(Pipeline):
                 cloned_transformer = transformer
             else:
                 cloned_transformer = clone(transformer)
+
             # Fit or load from cache the current transformer
             X, y, fitted_transformer = fit_transform_one_cached(
                 cloned_transformer,
@@ -60,21 +62,22 @@ class TransformPipeline(Pipeline):
             # transformer. This is necessary when loading the transformer
             # from the cache.
             self.steps[step_idx] = (name, fitted_transformer)
+            self.results.append((X, y))
             if hasattr(fitted_transformer, "_y_lengths"):
                 self._y_lengths = getattr(fitted_transformer, "_y_lengths")
         return X, y
 
-    def fit(self, X: np.ndarray, y: Optional[np.ndarray] = None, **fit_params):
+    def fit(self, X: Sequence, y: Optional[Sequence] = None, **fit_params):
         """Fit the model.
         Fit all the transformers one after the other and transform the
         data. Finally, fit the transformed data using the final estimator.
 
         Parameters
         ----------
-        X : np.ndarray
+        X : Sequence
             Training data. Must fulfill input requirements of first step of the
             pipeline.
-        y : np.ndarray, default=None
+        y : Sequence, default=None
             Training targets. Must fulfill label requirements for all steps of
             the pipeline.
         **fit_params : dict of string -> object
@@ -98,7 +101,9 @@ class TransformPipeline(Pipeline):
 
         return self
 
-    def fit_transform(self, X, y=None, **fit_params):
+    def fit_transform(
+        self, X: Sequence, y: Optional[Sequence] = None, **fit_params
+    ) -> Sequence:
         """Fit the model and transform with the final estimator.
         Fits all the transformers one after the other and transform the
         data. Then uses `fit_transform` on transformed data with the final
@@ -117,7 +122,8 @@ class TransformPipeline(Pipeline):
             ``s`` has key ``s__p``.
         Returns
         -------
-        Xt : ndarray of shape (n_samples, n_transformed_features)
+        Xt : Sequence
+            Typically ndarray of shape (n_samples, n_transformed_features)
             Transformed samples.
         """
         fit_params_steps = self._check_fit_params(**fit_params)
@@ -138,7 +144,7 @@ class TransformPipeline(Pipeline):
             return x_hat
 
     @available_if(_final_estimator_has("score"))
-    def score(self, X, y=None, sample_weight=None):
+    def score(self, X: Sequence, y=None, sample_weight=None):
         """Transform the data, and apply `score` with the final estimator.
         Call `transform` of each transformer in the pipeline. The transformed
         data are finally passed to the final estimator that calls
@@ -169,11 +175,6 @@ class TransformPipeline(Pipeline):
             yt = (
                 yt if not hasattr(transform, "_y_hat") else getattr(transform, "_y_hat")
             )
-            # Check for nan
-            if np.isnan(yt.astype(np.float64)).any():
-                nan_mask = np.isnan(yt)
-                Xt = Xt[~nan_mask]
-                yt = yt[~nan_mask]
 
         score_params = {}
         if sample_weight is not None:
@@ -181,8 +182,8 @@ class TransformPipeline(Pipeline):
         return self.steps[-1][1].score(Xt, yt, **score_params)
 
     def transform(
-        self, X: np.ndarray, y: np.ndarray, debug: bool = False
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        self, x: Sequence, y: Sequence, debug: bool = False
+    ) -> Tuple[Sequence, Sequence]:
         """
         preform a transformation on both the data and the labels. Useful for
         when labels need to be removed with data or when data is split up and
@@ -193,9 +194,9 @@ class TransformPipeline(Pipeline):
 
          Parameters
         ----------
-        X : np.ndarray
+        x : Sequence
             The input data set
-        y : np.ndarray
+        y : Sequence
             The original target values for the data set
         debug : bool
             if true, expections will save information suche as original data,
@@ -203,77 +204,74 @@ class TransformPipeline(Pipeline):
 
         Returns
         -------
-        Tuple[np.ndarray, np.ndarray]
+        Tuple[Sequence, Sequence]
             The transformed X and y values
         """
-        self.X_original: np.ndarray = X
-        self.y_original: np.ndarray = y
-        self.results: List[Tuple] = []
+        # Store the original data
+        self.x_original: Sequence = x
+        self.y_original: Sequence = y
+        self.results = []
 
-        X_hat: np.ndarray
-        y_hat: np.ndarray
-        for name, step in self.steps:
-            X_hat, y_hat = self._step_transform(step, X, y, debug)
-
-            # Check for nan
-            # if np.isnan(y_hat.astype(np.float64)).any():
-            # nan_mask = np.isnan(y_hat)
-            # X_hat = X_hat[~nan_mask]
-            # y_hat = y_hat[~nan_mask]
+        xt: Sequence = x
+        yt: Sequence
+        for idx, name, transform in self._iter():
+            xt, yt = _transform_one(transform, x, y, debug=debug)
 
             # Validation
-            assert X_hat.shape[0] == y_hat.shape[0], (
-                f"X_hat rows = {X_hat.shape[0]}"
-                + f", while y_hat rows = {y_hat.shape[0]}"
+            assert len(xt) == len(yt), (
+                f"xt rows = {len(xt)}"
+                + f", while yt rows = {len(yt)}"
                 + f".\nStep: {name}"
                 + f".\n\n preprocessor: {self}"
             )
-            dims: List = list(X_hat.shape)
-            for i, dim in enumerate(dims):
-                assert dim > 0, (
-                    f"The {name} step (step #{step}) of the pipeline "
-                    + f"depleted the values in dimension {i} of the data "
-                    + "matrix"
-                )
 
-            self.results.append((X_hat, y_hat))
-            X, y = X_hat, y_hat
+            # Validate dimensions
+            if isinstance(xt, np.ndarray):
+                xta: np.ndarray = cast(np.ndarray, xt)
+                dims: List = list(xta.shape)
+                for i, dim in enumerate(dims):
+                    assert dim > 0, (
+                        f"The {name} step (step #{idx}) of the pipeline "
+                        + f"depleted the values in dimension {i} of the data "
+                        + "matrix"
+                    )
 
-        return (X_hat, y_hat)
+            self.results.append((xt, yt))
+            x, y = xt, yt
 
-    def _step_transform(
-        self, step: Any, X: np.ndarray, y: np.ndarray, debug: bool = False
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """Preform the actual data transformation at the given step"""
-        X_hat: np.ndarray
-        y_hat: np.ndarray
-        try:
-            X_hat = step.fit_transform(X, y)
-            y_hat = y if not hasattr(step, "_y_hat") else getattr(step, "_y_hat")
-
-            self._y_hat = y_hat
-            return (X_hat, y_hat)
-        except Exception as e:
-            if debug:
-                data_artifact: Dict = {
-                    "initial_data": {"X": self.X_original, "y": self.y_original},
-                    "input_data": {"X": X, "y": y},
-                    "pipeline": self,
-                    "step": step,
-                }
-                cur_time: datetime = datetime.now()
-                cur_time_str: str = cur_time.strftime("%Y%m%d%H%M%S")
-                data_filename: str = f"pipeline_error_{cur_time_str}.p"
-
-                fh: IO[bytes]
-                with open(data_filename, "wb") as fh:
-                    pickle.dump(data_artifact, fh)
-
-            raise e
+        return (xt, yt)
 
 
-def _transform_one(transformer, X, y, weight, **fit_params):
-    res_x, res_y = transformer.transform(X, y)
+def _transform_one(
+    transformer: TransformerMixin,
+    x: Sequence,
+    y: Sequence,
+    weight: Optional[float] = None,
+    **fit_params,
+) -> Tuple[Sequence, Sequence]:
+    debug: bool = fit_params.get("debug", False)
+    try:
+        res_x: Sequence = transformer.transform(x, y)
+        res_y: Sequence = (
+            y if not hasattr(transformer, "_y_hat") else getattr(transformer, "_y_hat")
+        )
+        return (res_x, res_y)
+    except Exception as e:
+        if debug:
+            data_artifact: Dict = {
+                "input_data": {"x": x, "y": y},
+                "transformer": transformer,
+            }
+            cur_time: datetime = datetime.now()
+            cur_time_str: str = cur_time.strftime("%Y%m%d%H%M%S")
+            data_filename: str = f"pipeline_error_{cur_time_str}.p"
+
+            fh: IO[bytes]
+            with open(data_filename, "wb") as fh:
+                pickle.dump(data_artifact, fh)
+
+        raise e
+
     # if we have a weight for this transformer, multiply output
     if weight is None:
         return res_x, res_y
@@ -303,12 +301,6 @@ def _fit_transform_one(
                 if not hasattr(transformer, "_y_hat")
                 else getattr(transformer, "_y_hat")
             )
-
-        # Check for nan
-        # if np.isnan(res_y.astype(np.float64)).any():
-        # nan_mask = np.isnan(res_y)
-        # res_x = res_x[~nan_mask]
-        # res_y = res_y[~nan_mask]
 
     if weight is None:
         return res_x, res_y, transformer

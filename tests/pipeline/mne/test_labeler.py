@@ -1,4 +1,4 @@
-import mne
+import mne  # type: ignore
 import numpy as np
 from mne.io import RawArray  # type: ignore
 from mne import create_info, set_log_level  # type: ignore
