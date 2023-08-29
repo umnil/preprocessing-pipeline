@@ -272,9 +272,7 @@ class Windower(TransformerMixin, BaseEstimator):
             x = np.moveaxis(x, dim_list, np.arange(dim_list.size))
             if self.label_scheme == 3:
                 # Calculate label transformation
-                y: np.ndarray = cast(
-                    np.ndarray, self._window_transform(self._y, self.axis)
-                )
+                y = cast(np.ndarray, self._window_transform(self._y, self.axis))
 
                 # Reshape to known axes (n, n_win, ...)
                 x = np.moveaxis(x, self.axis - 1, 1)
