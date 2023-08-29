@@ -97,7 +97,7 @@ class Windower(TransformerMixin, BaseEstimator):
         self._y_hat = self._make_labels(y)
         return self
 
-    def transform(self, X: np.ndarray) -> np.ndarray:
+    def transform(self, X: np.ndarray, *args, **kwargs) -> np.ndarray:
         """Transforms the dataframe of packets into a dataframe of windows
 
         Parameters
