@@ -91,15 +91,6 @@ class Labeler(TransformerMixin, BaseEstimator):
         Labeler
             self
         """
-        if not isinstance(x, List):
-            x = [x]
-
-        filtered_labels: List = [self.filter_labels(self.load_labels(i)) for i in x]
-        y_hat_list: List = [i[0] for i in filtered_labels]
-        mask_list: List = [i[1] for i in filtered_labels]
-        self._y_lengths = [i.shape[-1] for i in y_hat_list]
-        self._y_hat = utils.equalize_list_to_array(y_hat_list)
-        self._mask = mask_list
         return self
 
     @staticmethod
@@ -155,6 +146,15 @@ class Labeler(TransformerMixin, BaseEstimator):
         if not isinstance(x, List):
             x = [x]
 
+        # Process Labels
+        filtered_labels: List = [self.filter_labels(self.load_labels(i)) for i in x]
+        y_hat_list: List = [i[0] for i in filtered_labels]
+        mask_list: List = [i[1] for i in filtered_labels]
+        self._y_lengths = [i.shape[-1] for i in y_hat_list]
+        self._y_hat = utils.equalize_list_to_array(y_hat_list)
+        self._mask = mask_list
+
+        # Process data
         data_list: List[np.ndarray] = []
         for i in x:
             i = i.copy() if self.channels is None else i.copy().pick(self.channels)

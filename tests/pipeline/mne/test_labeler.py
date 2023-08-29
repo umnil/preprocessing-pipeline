@@ -1,4 +1,4 @@
-import mne
+import mne  # type: ignore
 import numpy as np
 from mne.io import RawArray  # type: ignore
 from mne import create_info, set_log_level  # type: ignore
@@ -151,42 +151,13 @@ def test_labeler_filter_labels_nonuniform() -> None:
     assert (observed == expected).all()
 
 
-def test_labeler_fit() -> None:
-    # Test fit with a single mne.Raw object
-    raw: RawArray = create_mock_raw()
-    labeler: Labeler = Labeler(labels=["label_1", "label_2"])
-    labeler.fit(raw)
-    assert labeler._y_hat.shape == (1, 3000)
-    assert labeler._y_lengths == [3000]
-
-    # Test fit with a list of mne.Raw objects
-    raw_list = [create_mock_raw(), create_mock_raw()]
-    labeler = Labeler(labels=["label_1", "label_2"])
-    labeler.fit(raw_list)
-    assert labeler._y_hat.shape == (2, 3000)
-    assert labeler._y_lengths == [3000, 3000]
-
-    # Non Uniform
-    # Test fit with a single mne.Raw object
-    raw = create_mock_raw(False)
-    labeler = Labeler(labels=["label_1", "label_2"])
-    labeler.fit(raw)
-    assert labeler._y_hat.shape == (1, 2500)
-    assert labeler._y_lengths == [2500]
-
-    # Test fit with a list of mne.Raw objects
-    raw_list = [create_mock_raw(False), create_mock_raw(False)]
-    labeler = Labeler(labels=["label_1", "label_2"])
-    labeler.fit(raw_list)
-    assert labeler._y_hat.shape == (2, 2500)
-    assert labeler._y_lengths == [2500, 2500]
-
-
 def test_labeler_transform() -> None:
     # Test transform with a single mne.Raw object
     raw: RawArray = create_mock_raw()
     labeler: Labeler = Labeler()
     x: np.ndarray = labeler.fit_transform(raw)
+    assert labeler._y_hat.shape == (1, 5000)
+    assert labeler._y_lengths == [5000]
     assert x.shape == (1, 6, 5000)
 
     # Test transform with a single mne.Raw object
@@ -200,6 +171,7 @@ def test_labeler_transform() -> None:
     labeler = Labeler(labels=["label_1", "label_2"])
     x = labeler.fit_transform(raw_list)
     assert labeler._y_hat.shape == (2, 3000)
+    assert labeler._y_lengths == [3000, 3000]
     assert x.shape == (2, 6, 3000)
 
     # Non-Uniform
@@ -234,7 +206,7 @@ def test_labeler_transform() -> None:
     # and lengths
     raw_list = [create_mock_raw(False), create_mock_raw(False, 2)]
     labeler = Labeler(labels=["label_1", "label_2"])
-    x = labeler.fit_transform(raw_list)
+    x = labeler.transform(raw_list)
     y = labeler._y_hat
     assert y.shape == (2, 3500)
     assert x.shape == (2, 6, 3500)

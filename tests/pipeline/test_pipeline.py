@@ -15,4 +15,4 @@ class TestPipeline:
     def test_fit_transform(self):
         data = pd.read_pickle(self.data_file_path)
         assert data.shape[0] == data["prompt"].values.shape[0]
-        preprocessor.transform(data, data["prompt"].values)
+        preprocessor.fit_transform(data, data["prompt"].values)
