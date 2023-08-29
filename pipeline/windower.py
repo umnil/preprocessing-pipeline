@@ -227,6 +227,28 @@ class Windower(TransformerMixin, BaseEstimator):
         Windower
             The current instance of the windowing object
         """
+        return self
+
+    def fit_transform(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        return self.transform(x, y)
+
+    def transform(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        """Transforms the dataframe of packets into a dataframe of windows
+
+        Parameters
+        ----------
+        x : np.ndarray
+            see `fit()`
+
+        y : np.ndarray
+
+        Returns
+        -------
+        np.ndarray
+            WxD matrix where W is the number of windows and `D = packet_size *
+            window_size`
+        """
+        # Process y data
         assert y.ndim > 1, "y labels must be at least two dimensions"
         assert x.ndim > 1, "x labels must be at least two dimensions"
         self._t = np.prod(np.array(x.shape)[self.axis])
@@ -238,22 +260,6 @@ class Windower(TransformerMixin, BaseEstimator):
                 self._y_hat if self._y_hat.ndim > 1 else self._y_hat[None, ...]
             )
         ]
-        return self
-
-    def transform(self, x: np.ndarray) -> np.ndarray:
-        """Transforms the dataframe of packets into a dataframe of windows
-
-        Parameters
-        ----------
-        x : np.ndarray
-            see `fit()`
-
-        Returns
-        -------
-        np.ndarray
-            WxD matrix where W is the number of windows and `D = packet_size *
-            window_size`
-        """
         # place all time axes in the back and all other axes up front
         # Flatten the back so that time is linear across all other axes
         dim_list: np.ndarray = np.arange(x.ndim)
@@ -266,9 +272,7 @@ class Windower(TransformerMixin, BaseEstimator):
             x = np.moveaxis(x, dim_list, np.arange(dim_list.size))
             if self.label_scheme == 3:
                 # Calculate label transformation
-                y: np.ndarray = cast(
-                    np.ndarray, self._window_transform(self._y, self.axis)
-                )
+                y = cast(np.ndarray, self._window_transform(self._y, self.axis))
 
                 # Reshape to known axes (n, n_win, ...)
                 x = np.moveaxis(x, self.axis - 1, 1)
