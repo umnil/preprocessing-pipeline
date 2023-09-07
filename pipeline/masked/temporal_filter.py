@@ -1,7 +1,7 @@
 import numpy as np
 
 from mne.decoding import TemporalFilter  # type: ignore
-from typing import Tuple
+from typing import List, Tuple
 
 
 class MaskedTemporalFilter(TemporalFilter):
@@ -50,12 +50,60 @@ class MaskedTemporalFilter(TemporalFilter):
         -------
         X : array
             The data after filtering.
-        """  # noqa: E501
+        """
         input_shape: Tuple = x.shape
         t: int = input_shape[-1]
         x = x.reshape(-1, t)
-        list_x = [super(MaskedTemporalFilter, self).transform(i[~i.mask])[0] for i in x]
-        np_x = np.array([np.concatenate([i, [np.nan] * (t - i.size)]) for i in list_x])
-        x = np.ma.masked_invalid(np_x)
+
+        if not isinstance(x, np.ma.core.MaskedArray):
+            x = super(MaskedTemporalFilter, self).transform(x)
+            x = x.reshape(input_shape)
+            return x
+
+        # unmask
+        list_x: List = [i.data[~i.mask] for i in x]
+
+        # filter
+        window_lengths: np.ndarray = np.unique([i.size for i in list_x if i.size != 0])
+        if len(window_lengths) == 1:
+            pre_mask = x.mask.copy()
+            x = super(MaskedTemporalFilter, self).transform(x.copy())
+
+            # The filter removes masking
+            x = np.ma.MaskedArray(x, pre_mask)
+        else:
+            np_x = self.transform_indiv(list_x, t)
+            x = np.ma.masked_invalid(np_x)
+
         x = x.reshape(input_shape)
         return x
+
+    def transform_indiv(self, x_list: List, t: int) -> np.ndarray:
+        """Filter each element in `x_list` in the event
+        that each element may have a separate length of
+        points
+
+        Parameters
+        ----------
+        x_list : List
+            A list of numpy arrays with data to pass through a filter
+        t : int
+            The maximum size that the data should be padded to
+
+        Returns
+        -------
+        np.ndarray
+            A stacked NxM array. Data are padded to M
+        """
+        x_list = [
+            np.array([np.nan] * t)
+            if len(i) == 0
+            else super(MaskedTemporalFilter, self).transform(i)[0]
+            for i in x_list
+        ]
+        x_list = [
+            np.pad(i, [0, t - i.size], "constant", constant_values=[np.nan])
+            for i in x_list
+        ]
+        np_x: np.ndarray = np.stack(x_list)
+        return np_x

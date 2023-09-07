@@ -8,6 +8,18 @@ class MaskedPSDBinner(PSDBinner):
     def transform(  # type: ignore
         self, x: np.ma.core.MaskedArray, *args, **kwargs  # type: ignore
     ) -> np.ndarray:  # type: ignore
+        if not isinstance(x, np.ma.core.MaskedArray):
+            return super(MaskedPSDBinner, self).transform(x, *args, **kwargs)
+
+        # If only one dimension is raggid and no nans just reapply the mask
+        n_diff_axes = sum([not x.mask.prod(axis=i).any() for i in range(x.mask.ndim)])
+        if n_diff_axes < 2:
+            input_mask: np.ndarray = x.mask.copy()
+            x = super(MaskedPSDBinner, self).transform(x.data, **kwargs)
+            output_mask: np.ndarray = input_mask[..., : x.shape[-1]]
+            x = np.ma.MaskedArray(x, output_mask)
+            return x
+
         input_shape: Tuple = x.shape
         output_shape: List = list(input_shape[:-1]) + [len(self.bins)]
         x = x.reshape(-1, input_shape[-1])
