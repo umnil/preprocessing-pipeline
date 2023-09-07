@@ -16,7 +16,7 @@ class Decorrelate(BaseEstimator, TransformerMixin):
         """
         self.threshold: float = threshold
 
-    def fit(self, x: np.ndarray, y: np.ndarray, **fitparams):
+    def fit(self, x: np.ndarray, y: np.ndarray, **fitparams) -> "Decorrelate":
         # Ensure 2D
         x = x.reshape(-1, x.shape[-1])
 
