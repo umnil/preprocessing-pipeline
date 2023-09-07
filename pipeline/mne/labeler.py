@@ -129,13 +129,17 @@ class Labeler(TransformerMixin, BaseEstimator):
 
         return y_labels
 
-    def transform(self, x: Union[mne.io.Raw, List[mne.io.Raw]]) -> np.ndarray:
+    def transform(
+        self, x: Union[mne.io.Raw, List[mne.io.Raw]], y: Optional[np.ndarray] = None
+    ) -> np.ndarray:
         """Transform an mne.Raw object into individual data and labels
 
         Parameters
         ----------
         x : Union[mne.io.Raw, List[mne.io.Raw]]
             The mne Rae object that contains data and annotations
+        y : Optional
+            Unused
 
         Returns
         -------
