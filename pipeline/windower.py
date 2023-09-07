@@ -19,6 +19,7 @@ class Windower(TransformerMixin, BaseEstimator):
         label_scheme: int = 0,
         window_step: int = 80,
         trial_size: int = 60000,
+        return_masked: bool = False,
         axis: int = -1,
     ):
         """
@@ -50,6 +51,10 @@ class Windower(TransformerMixin, BaseEstimator):
             divided prior to windowing. This is the number of packets expected
             per trial
             Ignored if `label_scheme == 4`
+        return_masked : bool
+            When True the labels and data are returned as a masked array. This
+            logic only applies to labeling shemes that either remove (e.g.,
+            labal_scheme == 3) or add to (e.g., label_scheme == 4)
         axis : int
             The dimension across which to perform windowing.
         """
@@ -58,6 +63,7 @@ class Windower(TransformerMixin, BaseEstimator):
         self.trial_size: int = trial_size
         self.label_scheme: int = label_scheme
         self._window_packets: np.ndarray = np.array([])
+        self.return_masked: bool = return_masked
         self.axis: int = axis
 
         # Uninitialized variables to be defined later
@@ -101,9 +107,22 @@ class Windower(TransformerMixin, BaseEstimator):
             y_transformed = y.squeeze()
         elif self.label_scheme == 3:
             # Non-ambiguous
-            y = utils.mask_list(
-                [[win[0] for win in inst if len(set(win)) < 2] for inst in y]
-            )
+            if self.return_masked:
+                mask: np.ndarray = np.zeros(y.shape)
+                flattened_y = y.reshape(-1, self.samples_per_window)
+                mask = mask.reshape(flattened_y.shape)
+                i: np.ndarray = np.array(
+                    [i for i, a, in enumerate(flattened_y) if len(set(a)) < 2]
+                )
+                j: np.ndarray = np.zeros(i.size).astype(np.int32)
+                mask[i, j] = 1
+                mask = mask.reshape(y.shape).astype(bool)
+                y = np.ma.MaskedArray(data=y, mask=~mask)[..., 0]
+            else:
+                y = utils.mask_list(
+                    [[win[0] for win in inst if len(set(win)) < 2] for inst in y]
+                )
+
             y_transformed = y.squeeze()
         elif self.label_scheme == 4:
             # Windows by labels
@@ -276,12 +295,23 @@ class Windower(TransformerMixin, BaseEstimator):
 
                 # Reshape to known axes (n, n_win, ...)
                 x = np.moveaxis(x, self.axis - 1, 1)
-                x = utils.mask_list(
-                    [
-                        [xwin for xwin, ywin in zip(xi, yi) if len(set(ywin)) < 2]
-                        for xi, yi in zip(x, y)
-                    ]
-                )
+                if self.return_masked:
+                    flattened_x: np.ndarray = x.reshape(-1, *x.shape[2:])
+                    flattened_y: np.ndarray = y.reshape(-1, self.samples_per_window)
+                    mask: np.ndarray = np.zeros(flattened_x.shape)
+                    i: np.ndarray = np.array(
+                        [i for i, a in enumerate(flattened_y) if len(set(a)) < 2]
+                    )
+                    mask[i, ...] = 1
+                    mask = mask.reshape(x.shape).astype(bool)
+                    x = np.ma.MaskedArray(data=x, mask=~mask)
+                else:
+                    x = utils.mask_list(
+                        [
+                            [xwin for xwin, ywin in zip(xi, yi) if len(set(ywin)) < 2]
+                            for xi, yi in zip(x, y)
+                        ]
+                    )
 
                 # Reseparate the n and windowing axes
                 x = np.moveaxis(x, 1, self.axis - 1)

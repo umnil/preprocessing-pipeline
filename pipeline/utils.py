@@ -88,7 +88,39 @@ def generate_padding_param(
     return [[0, len] for i, len in enumerate(lens)]
 
 
+def get_frequency_bins() -> List[Tuple]:
+    """Return a constant value of frequency bounds
+
+    Returns
+    -------
+    List[Tuple]
+    """
+    return [
+        (0, 4),  # Theta
+        (4, 8),  # Delta
+        (8, 12),  # Alpha
+        (12, 21),  # Low Beta
+        (21, 30),  # High Beta
+        (30, 45),  # Low Gamma
+        (45, 70),  # Mid Gamma
+        (70, 100),  # High Gamma
+    ]
+
+
 def mask_list(input_list: List) -> np.ndarray:
+    """Given a list of input data, merge them to shared axes dimensions and pad
+    with NaN where needed
+
+    Parameters
+    ----------
+    input_list : List
+        A list of numpy arrays to be masked and merged
+
+    Returns
+    -------
+    np.ndarray
+        The merged data array
+    """
     contains_list: bool = True in [isinstance(li, Iterable) for li in input_list]
     if contains_list:
         array_list = [mask_list(i) for i in input_list]
@@ -103,6 +135,16 @@ def unmask_array(a: np.ndarray) -> List:
     """Given an array `a` that may or may not have been created using
     `equalize_list_to_array` convert to a list of arrays and remove any NaN
     Padding
+
+    Parameters
+    ----------
+    a : np.ndarray
+        The input array with masked NaN values
+
+    Returns
+    -------
+    List
+        A list of numpy arrays with the dimensions pulled out and masked Nans cleared
     """
     ma: np.ma.core.MaskedArray = np.ma.masked_invalid(a)
     ma_list: List = ma.tolist()
@@ -110,6 +152,18 @@ def unmask_array(a: np.ndarray) -> List:
 
 
 def unmask_list(input_list: List) -> List:
+    """Recursively unmask all arrays in a list
+
+    Parameters
+    ----------
+    input_list : List
+        Input arrays
+
+    Returns
+    -------
+    List
+        List of list of unmasked data
+    """
     result: List = []
     for i in input_list:
         if isinstance(i, list):
