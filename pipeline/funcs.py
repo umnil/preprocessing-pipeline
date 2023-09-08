@@ -68,9 +68,9 @@ def filter_bank(x: np.ndarray, bins: Optional[List[Tuple]] = None) -> np.ndarray
         TemporalFilter(sfreq=256, l_freq=lo, h_freq=hi) for lo, hi in _bins
     ]
     if isinstance(x, np.ma.core.MaskedArray):
-        return np.ma.stack([f.fit_transform(x) for f in bank], axis=2)
+        return np.ma.stack([f.fit_transform(x) for f in bank], axis=-3)
     else:
-        return np.stack([f.fit_transform(x) for f in bank], axis=2)
+        return np.stack([f.fit_transform(x) for f in bank], axis=-3)
 
 
 def good_channels(x: List[mne.io.Raw]) -> List[mne.io.Raw]:
