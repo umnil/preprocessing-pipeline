@@ -1,6 +1,8 @@
 from .mask import Masker
 from .metrics import (
     masked_accuracy_score as accuracy_score,
+    masked_f1_score as f1_score,
+    masked_precision_recall_curve as precision_recall_curve,
     masked_roc_auc_score as roc_auc_score,
 )
 from .minmax_scaler import MaskedMinMaxScaler as MinMaxScaler
@@ -19,4 +21,6 @@ StandardScaler
 TemporalFilter
 
 accuracy_score
+f1_score
+precision_recall_curve
 roc_auc_score
