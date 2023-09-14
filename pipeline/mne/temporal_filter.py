@@ -1,4 +1,4 @@
-import mne
+import mne  # type: ignore
 import numpy as np
 from typing import Tuple
 

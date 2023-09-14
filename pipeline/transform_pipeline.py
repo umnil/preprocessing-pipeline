@@ -190,6 +190,49 @@ class TransformPipeline(Pipeline):
 
         return self.steps[-1][1].predict(xt, **predict_params)
 
+    @available_if(_final_estimator_has("predict_proba"))
+    def predict_proba(
+        self, x: Sequence, y: Optional[Sequence] = None, **predict_proba_params
+    ):
+        """Transform the data, and apply `predict_proba` with the final estimator.
+
+        Call `transform` of each transformer in the pipeline. The transformed
+        data are finally passed to the final estimator that calls
+        `predict_proba` method. Only valid if the final estimator implements
+        `predict_proba`.
+
+        Parameters
+        ----------
+        X : iterable
+            Data to predict on. Must fulfill input requirements of first step
+            of the pipeline.
+
+        **predict_proba_params : dict of string -> object
+            Parameters to the `predict_proba` called at the end of all
+            transformations in the pipeline.
+
+        Returns
+        -------
+        y_proba : ndarray of shape (n_samples, n_classes)
+            Result of calling `predict_proba` on the final estimator.
+        """
+        xt = x
+        yt = y
+        for _, name, transform in self._iter(with_final=False):
+            has_y_param: bool = "y" in inspect.signature(transform.transform).parameters
+            if has_y_param:
+                xt = transform.transform(xt, yt)
+                yt = (
+                    yt
+                    if not hasattr(transform, "_y_hat")
+                    else getattr(transform, "_y_hat")
+                )
+            else:
+                xt = transform.transform(xt)
+
+        self._y_hat = yt
+        return self.steps[-1][1].predict_proba(xt, **predict_proba_params)
+
     @available_if(_final_estimator_has("score"))
     def score(self, X: Sequence, y=None, sample_weight=None):
         """Transform the data, and apply `score` with the final estimator.
