@@ -1,4 +1,4 @@
-import mne
+import mne  # type: ignore
 import numpy as np
 from mne import set_eeg_reference  # type: ignore
 from typing import List, Optional, Tuple

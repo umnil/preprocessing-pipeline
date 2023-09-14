@@ -1,5 +1,10 @@
 import numpy as np
-from sklearn.metrics import accuracy_score, f1_score, precision_recall_curve, roc_auc_score  # type: ignore
+from sklearn.metrics import (  # type: ignore
+    accuracy_score,
+    f1_score,
+    precision_recall_curve,
+    roc_auc_score,
+)
 from typing import Tuple
 
 
