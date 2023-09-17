@@ -12,6 +12,7 @@ from .interpolator import Interpolator
 from .masked import Masker
 from .optional_transformer import OptionalTransformer
 from .pairer import Pairer
+from .pca import NDPCA
 from .polydetrend import PolyDetrend
 from .psdbinner import PSDBinner
 from .transform_pipeline import TransformPipeline
@@ -22,6 +23,7 @@ Decorrelate
 Extractor
 Interpolator
 Masker
+NDPCA
 OptionalTransformer
 Pairer
 PolyDetrend

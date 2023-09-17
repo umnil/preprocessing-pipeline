@@ -1,10 +1,11 @@
 import numpy as np
 
 from mne.decoding import TemporalFilter  # type: ignore
+from sklearn.base import BaseEstimator  # type: ignore
 from typing import List, Tuple
 
 
-class MaskedTemporalFilter(TemporalFilter):
+class MaskedTemporalFilter(BaseEstimator, TemporalFilter):
     def __init__(
         self,
         l_freq=None,
