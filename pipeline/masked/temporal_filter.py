@@ -1,7 +1,7 @@
 import numpy as np
 
 from mne.decoding import TemporalFilter  # type: ignore
-from sklearn.base import BaseEstimator
+from sklearn.base import BaseEstimator  # type: ignore
 from typing import List, Tuple
 
 

@@ -23,6 +23,7 @@ Decorrelate
 Extractor
 Interpolator
 Masker
+NDPCA
 OptionalTransformer
 Pairer
 PolyDetrend
