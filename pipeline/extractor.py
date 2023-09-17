@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd  # type: ignore
 
 from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
-from typing import List, Union, cast
+from typing import List, Optional, Union, cast
 
 
 class Extractor(TransformerMixin, BaseEstimator):
@@ -36,7 +36,9 @@ class Extractor(TransformerMixin, BaseEstimator):
         """
         return self
 
-    def transform(self, X: Union[List, pd.DataFrame]) -> np.ndarray:
+    def transform(
+        self, X: Union[List, pd.DataFrame], y: Optional[np.ndarray] = None
+    ) -> np.ndarray:
         """transform an input of trial data in the form of a DataFrame into a
         multi dimensional array of (N x C x T) where:
           - N = Number of Epochs or Instances
@@ -51,6 +53,9 @@ class Extractor(TransformerMixin, BaseEstimator):
         X : Union[List, pd.DataFrame]
             A single or list of NXM table(s). N = number of packets. M = number
             of packet features
+
+        y : Optional[np.ndarray]
+            Optional input. Ignored
 
         Returns
         -------
