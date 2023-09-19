@@ -8,6 +8,15 @@ class NDPCA(PCA):
         x = self.prepare_inputs(x, x.shape)
         return super(NDPCA, self).fit(x, y)
 
+    def fit_transform(
+        self, x: np.ndarray, y: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+        original_shape: Tuple = x.shape
+        x = self.prepare_inputs(x, original_shape)
+        x = super(NDPCA, self).fit(x, y)
+        x = self.prepare_outputs(x, original_shape)
+        return x
+
     def prepare_inputs(self, x: np.ndarray, original_shape: Tuple) -> np.ndarray:
         n_features: int = original_shape[-1]
         x = x.reshape(-1, n_features)
