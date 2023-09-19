@@ -341,10 +341,17 @@ def _transform_one(
 ) -> Tuple[Sequence, Sequence]:
     debug: bool = fit_params.get("debug", False)
     try:
-        res_x: Sequence = transformer.transform(x, y)
-        res_y: Sequence = (
-            y if not hasattr(transformer, "_y_hat") else getattr(transformer, "_y_hat")
-        )
+        has_y_param: bool = "y" in inspect.signature(transformer.transform).parameters
+        if has_y_param:
+            res_x: Sequence = transformer.transform(x, y)
+            res_y: Sequence = (
+                y
+                if not hasattr(transformer, "_y_hat")
+                else getattr(transformer, "_y_hat")
+            )
+        else:
+            res_x = transformer.transform(x)
+            res_y = y
         return (res_x, res_y)
     except Exception as e:
         if debug:
