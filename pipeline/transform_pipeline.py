@@ -329,6 +329,7 @@ class TransformPipeline(Pipeline):
             self.results.append((xt, yt))
             x, y = xt, yt
 
+        self._y_hat = yt
         return (xt, yt)
 
 
