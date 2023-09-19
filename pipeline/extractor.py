@@ -11,10 +11,11 @@ class Extractor(TransformerMixin, BaseEstimator):
     for use in scikit-learn and MNE pipelines
     """
 
-    def __init__(self, picks: List[int] = []):
+    def __init__(self, picks: List[int] = [], y_column: str = "prompt"):
         super(Extractor, self).__init__()
         self._data_column_name: str = "data"
         self.picks: List[int] = picks
+        self.y_column: str = y_column
 
         # Uninitialized Variables
         self._X: np.ndarray
@@ -63,8 +64,14 @@ class Extractor(TransformerMixin, BaseEstimator):
             an NxCXxT matrix as described above
         """
         if type(X) is list:
-            trial_results: List = [self.transform(x) for x in X]
-            self._X = np.vstack(trial_results)
+            trial_results: List = []
+            for x in X:
+                xt: np.ndarray = self.transform(x)
+                yt: np.ndarray = self._y_hat
+                trial_results.append((xt, yt))
+
+            self._X = np.concatenate([i[0] for i in trial_results])
+            self._y_hat = np.concatenate([i[1] for i in trial_results])
         else:
             self._data_column_name = self._resolve_data_column_name(X)
             self._channel_info = self._resolve_channel_info(X)
@@ -95,6 +102,17 @@ class Extractor(TransformerMixin, BaseEstimator):
                     ]
                 )
             self._X = ret
+
+            # Ensure appropriate shape
+            if y is None:
+                y = X[self.y_column].values
+
+            self._y_hat = np.repeat(y[..., None], self._X.shape[-1], axis=-1).flatten()[
+                None, ...
+            ]
+            self._X = np.swapaxes(self._X, 0, 1)
+            self._X = self._X.reshape(self._X.shape[0], -1)[None, ...]
+
         return self._X
 
     def _resolve_data_column_name(self, X: pd.DataFrame) -> str:
