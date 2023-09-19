@@ -1,6 +1,5 @@
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin  # type: ignore
-from typing import Optional
 
 
 class ArtifactRemover(TransformerMixin, BaseEstimator):
@@ -19,9 +18,7 @@ class ArtifactRemover(TransformerMixin, BaseEstimator):
     def fit(self, x: np.ndarray, y: np.ndarray, *args, **kwargs) -> "ArtifactRemover":
         return self
 
-    def transform(
-        self, x: np.ndarray, y: np.ndarray = None, *args, **kwargs
-    ) -> np.ndarray:
+    def transform(self, x: np.ndarray, y: np.ndarray, *args, **kwargs) -> np.ndarray:
         mean: np.ndarray = x.mean(axis=-1)
         std: np.ndarray = x.std(axis=-1)
         lo_thresh: np.ndarray = mean - std * self.std
