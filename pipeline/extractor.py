@@ -19,6 +19,7 @@ class Extractor(TransformerMixin, BaseEstimator):
 
         # Uninitialized Variables
         self._X: np.ndarray
+        self._y_hat: np.ndarray
 
     def fit(self, X: Union[List, pd.DataFrame], *args, **kwargs) -> "Extractor":
         """Fit the data to be transfomred
@@ -64,54 +65,66 @@ class Extractor(TransformerMixin, BaseEstimator):
             an NxCXxT matrix as described above
         """
         if type(X) is list:
-            trial_results: List = []
-            for x in X:
-                xt: np.ndarray = self.transform(x)
-                yt: np.ndarray = self._y_hat
-                trial_results.append((xt, yt))
-
-            self._X = np.concatenate([i[0] for i in trial_results])
-            self._y_hat = np.concatenate([i[1] for i in trial_results])
+            self._X = self.transform_list(X, y)
         else:
-            self._data_column_name = self._resolve_data_column_name(X)
-            self._channel_info = self._resolve_channel_info(X)
-            self._picked_channel_info = [self._channel_info[i] for i in self.picks]
-            to_ragged: bool = np.unique(self._picked_channel_info).size > 1
-            data = cast(pd.DataFrame, X)["data"].values
-            if to_ragged:
-                max_size = np.max(self._picked_channel_info)
-                diff_channel_info = [
-                    max_size - self._channel_info[i]
-                    for i in range(len(self._channel_info))
-                ]
-                ret = np.array(
-                    [
-                        [
-                            ch + [np.nan] * diff_channel_info[i]
-                            for i, ch in enumerate(pkt)
-                            if i in self.picks
-                        ]
-                        for pkt in data
-                    ]
-                )
-            else:
-                ret = np.array(
-                    [
-                        [ch for i, ch in enumerate(pkt) if i in self.picks]
-                        for pkt in data
-                    ]
-                )
-            self._X = ret
+            self._X = self.transform_dataframe(X, y)
 
-            # Ensure appropriate shape
-            if y is None:
-                y = X[self.y_column].values
+        return self._X
 
-            self._y_hat = np.repeat(y[..., None], self._X.shape[-1], axis=-1).flatten()[
-                None, ...
+    def transform_dataframe(
+        self, x: pd.DataFrame, y: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+        """Performs transformation of a dataframe"""
+        self._data_column_name = self._resolve_data_column_name(x)
+        self._channel_info = self._resolve_channel_info(x)
+        self._picked_channel_info = [self._channel_info[i] for i in self.picks]
+        to_ragged: bool = np.unique(self._picked_channel_info).size > 1
+        data = cast(pd.DataFrame, x)["data"].values
+        if to_ragged:
+            max_size = np.max(self._picked_channel_info)
+            diff_channel_info = [
+                max_size - self._channel_info[i] for i in range(len(self._channel_info))
             ]
-            self._X = np.swapaxes(self._X, 0, 1)
-            self._X = self._X.reshape(self._X.shape[0], -1)[None, ...]
+            ret = np.array(
+                [
+                    [
+                        ch + [np.nan] * diff_channel_info[i]
+                        for i, ch in enumerate(pkt)
+                        if i in self.picks
+                    ]
+                    for pkt in data
+                ]
+            )
+        else:
+            ret = np.array(
+                [[ch for i, ch in enumerate(pkt) if i in self.picks] for pkt in data]
+            )
+        self._X = ret
+
+        # Ensure appropriate shape
+        if y is None:
+            y = x[self.y_column].values
+
+        self._y_hat = np.repeat(y[..., None], self._X.shape[-1], axis=-1).flatten()[
+            None, ...
+        ]
+        self._X = np.swapaxes(self._X, 0, 1)
+        self._X = self._X.reshape(self._X.shape[0], -1)[None, ...]
+
+        return self._X
+
+    def transform_list(
+        self, x: List[pd.DataFrame], y: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+        """Performs the transformation on a list of dataframes"""
+        trial_results: List = []
+        for i in x:
+            xt: np.ndarray = self.transform_dataframe(i)
+            yt: np.ndarray = self._y_hat
+            trial_results.append((xt, yt))
+
+        self._X = np.concatenate([i[0] for i in trial_results])
+        self._y_hat = np.concatenate([i[1] for i in trial_results])
 
         return self._X
 
