@@ -44,11 +44,16 @@ def concat(x: np.ndarray, y: np.ndarray, **kwargs) -> Tuple[np.ndarray, np.ndarr
     y : np.ndarray
         The concatenated output labels
     """
-    active = kwargs.get("active", False)
+    active: bool = kwargs.get("active", False)
+    keep_mask: bool = kwargs.get("keep_mask", False)
     x = np.moveaxis(x, 1, 2)
     if active:
-        x = np.concatenate(unmask_array(x)).astype(np.float64)
-        y = np.hstack(unmask_array(y))
+        if keep_mask:
+            x = x.reshape(-1, *x.shape[2:])
+            y = y.flatten()
+        else:
+            x = np.concatenate(unmask_array(x)).astype(np.float64)
+            y = np.hstack(unmask_array(y))
     return x.astype(np.float64), y.astype(np.float64)
 
 
