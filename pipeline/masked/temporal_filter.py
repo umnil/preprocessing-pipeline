@@ -22,7 +22,7 @@ class MaskedTemporalFilter(BaseEstimator, TemporalFilter):
         *,
         verbose=None,
         strict_masking=False
-    ):
+    ) -> None:
         self.verbose = None
         self.strict_masking: bool = strict_masking
         super().__init__(
