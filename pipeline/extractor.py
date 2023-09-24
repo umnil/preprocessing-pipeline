@@ -11,11 +11,17 @@ class Extractor(TransformerMixin, BaseEstimator):
     for use in scikit-learn and MNE pipelines
     """
 
-    def __init__(self, picks: List[int] = [], y_column: str = "prompt"):
+    def __init__(
+        self,
+        picks: List[int] = [],
+        y_column: str = "prompt",
+        output_packets: bool = False,
+    ):
         super(Extractor, self).__init__()
         self._data_column_name: str = "data"
         self.picks: List[int] = picks
         self.y_column: str = y_column
+        self.output_packets: bool = output_packets
 
         # Uninitialized Variables
         self._X: np.ndarray
@@ -101,15 +107,19 @@ class Extractor(TransformerMixin, BaseEstimator):
             )
         self._X = ret
 
-        # Ensure appropriate shape
         if y is None:
             y = x[self.y_column].values
 
-        self._y_hat = np.repeat(y[..., None], self._X.shape[-1], axis=-1).flatten()[
-            None, ...
-        ]
-        self._X = np.swapaxes(self._X, 0, 1)
-        self._X = self._X.reshape(self._X.shape[0], -1)[None, ...]
+        self._y_hat = y
+
+        if not self.output_packets:
+            # Ensure appropriate shape
+
+            self._y_hat = np.repeat(y[..., None], self._X.shape[-1], axis=-1).flatten()[
+                None, ...
+            ]
+            self._X = np.swapaxes(self._X, 0, 1)
+            self._X = self._X.reshape(self._X.shape[0], -1)[None, ...]
 
         return self._X
 
