@@ -6,17 +6,17 @@ from .masked import TemporalFilter
 from .utils import get_frequency_bins, unmask_array
 
 
-def channel_select(x: List[mne.io.Raw], central_only: bool = True) -> List[mne.io.Raw]:
+def channel_select(
+    x: List[mne.io.Raw], channels: Optional[str] = None
+) -> List[mne.io.Raw]:
     """Select only central channels from a set of EEG electrodes"""
     all_channel_names: List[str] = x[0].info.ch_names
     eeg_channel_names: List[str] = [
         i for i in all_channel_names if i[0] in ["F", "C", "P", "T", "O"]
     ]
-    central_channel_names: List[str] = [i for i in eeg_channel_names if "C" in i]
+
     return [
-        i.copy().pick(
-            picks=central_channel_names if central_only else eeg_channel_names
-        )
+        i.copy().pick(picks=channels if channels is not None else eeg_channel_names)
         for i in x
     ]
 
@@ -97,4 +97,6 @@ def good_channels(x: List[mne.io.Raw]) -> List[mne.io.Raw]:
     List[mne.io.Raw]
         Same list as input but bad channels are removed
     """
-    return [i.pick(np.setdiff1d(i.info.ch_names, i.info["bads"]).tolist()) for i in x]
+    return [
+        i.copy().pick(np.setdiff1d(i.info.ch_names, i.info["bads"]).tolist()) for i in x
+    ]
