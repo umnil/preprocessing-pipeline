@@ -13,7 +13,7 @@ class NDPCA(PCA):
     ) -> np.ndarray:
         original_shape: Tuple = x.shape
         x = self.prepare_inputs(x, original_shape)
-        x = super(NDPCA, self).fit(x, y)
+        x = super(NDPCA, self).fit(x, y).transform(x)
         x = self.prepare_outputs(x, original_shape)
         return x
 

@@ -20,9 +20,11 @@ class MaskedTemporalFilter(BaseEstimator, TemporalFilter):
         fir_window="hamming",
         fir_design="firwin",
         *,
-        verbose=None
-    ):
+        verbose=None,
+        strict_masking=False
+    ) -> None:
         self.verbose = None
+        self.strict_masking: bool = strict_masking
         super().__init__(
             l_freq,
             h_freq,
@@ -66,7 +68,7 @@ class MaskedTemporalFilter(BaseEstimator, TemporalFilter):
 
         # filter
         window_lengths: np.ndarray = np.unique([i.size for i in list_x if i.size != 0])
-        if len(window_lengths) == 1:
+        if len(window_lengths) == 1 or not self.strict_masking:
             pre_mask = x.mask.copy()
             x = super(MaskedTemporalFilter, self).transform(x.copy())
 

@@ -45,9 +45,6 @@ class Interpolator(TransformerMixin, BaseEstimator):
             x = cast(
                 np.ma.core.MaskedArray, np.moveaxis(cast(np.ndarray, x), self.axis, -1)
             )
-        x = x.reshape(-1, x.shape[-1])
-        self.sizes: List[int] = [i.data[~i.mask].shape[self.axis] for i in x]
-        self.dim_size: int = int(np.round(self.method(self.sizes)))
         return self
 
     def transform(self, x: np.ma.core.MaskedArray, *args, **kwargs) -> np.ndarray:
@@ -74,6 +71,8 @@ class Interpolator(TransformerMixin, BaseEstimator):
         # Force to 2D
         original_shape: Tuple = x.shape
         x = x.reshape(-1, original_shape[-1])
+        self.sizes: List[int] = [i.data[~i.mask].shape[self.axis] for i in x]
+        self.dim_size: int = int(np.round(self.method(self.sizes)))
 
         x_hat: np.ndarray = np.array(
             [

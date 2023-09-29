@@ -124,6 +124,9 @@ class Windower(TransformerMixin, BaseEstimator):
                 )
 
             y_transformed = y.squeeze()
+            if y_transformed.ndim < 2:
+                y_transformed = y_transformed[None, ...]
+
         elif self.label_scheme == 4:
             # Windows by labels
             y = self._y
