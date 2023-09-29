@@ -99,7 +99,8 @@ class TransformPipeline(Pipeline):
         with _print_elapsed_time("Pipeline", self._log_message(len(self.steps) - 1)):
             if self._final_estimator != "passthrough":
                 fit_params_last_step = fit_params_steps[self.steps[-1][0]]
-                fit_params_last_step.update({"lengths": self._y_lengths})
+                if hasattr(self._final_estimator, "use_lengths"):
+                    fit_params_last_step.update({"lengths": self._y_lengths})
                 self._final_estimator.fit(Xt, yt, **fit_params_last_step)
 
         return self
@@ -137,7 +138,9 @@ class TransformPipeline(Pipeline):
             if last_step == "passthrough":
                 return Xt, yt
             fit_params_last_step = fit_params_steps[self.steps[-1][0]]
-            fit_params_last_step.update({"lengths": self._y_lengths})
+            if hasattr(self, "use_lengths"):
+                if self.use_lengths:
+                    fit_params_last_step.update({"lengths": self._y_lengths})
             if hasattr(last_step, "fit_transform"):
                 x_hat = last_step.fit_transform(Xt, yt, **fit_params_last_step)
             else:
@@ -196,7 +199,8 @@ class TransformPipeline(Pipeline):
                 xt = transform.transform(xt)
         self._y_hat = yt
 
-        predict_params.update({"lengths": self._y_lengths})
+        if hasattr(self.steps[-1][1], "use_lengths"):
+            predict_params.update({"lengths": self._y_lengths})
         return self.steps[-1][1].predict(xt, **predict_params)
 
     @available_if(_final_estimator_has("predict_proba"))
@@ -245,7 +249,8 @@ class TransformPipeline(Pipeline):
                 xt = transform.transform(xt)
 
         self._y_hat = yt
-        predict_proba_params.update({"lengths": self._y_lengths})
+        if hasattr(self.steps[-1][1], "use_lengths"):
+            predict_proba_params.update({"lengths": self._y_lengths})
         return self.steps[-1][1].predict_proba(xt, **predict_proba_params)
 
     @available_if(_final_estimator_has("score"))
@@ -289,7 +294,8 @@ class TransformPipeline(Pipeline):
         score_params = {}
         if sample_weight is not None:
             score_params["sample_weight"] = sample_weight
-        score_params.update({"lengths": self._y_lengths})
+        if hasattr(self.steps[-1][1], "use_lengths"):
+            score_params.update({"lengths": self._y_lengths})
         return self.steps[-1][1].score(Xt, yt, **score_params)
 
     def transform(
@@ -322,6 +328,7 @@ class TransformPipeline(Pipeline):
         self.x_original: Sequence = x
         self.y_original: Sequence = y
         self.results = []
+        self._y_lengths = []
 
         xt: Sequence = x
         yt: Sequence
