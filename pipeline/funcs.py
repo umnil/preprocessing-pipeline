@@ -7,16 +7,21 @@ from .utils import get_frequency_bins, unmask_array
 
 
 def channel_select(
-    x: List[mne.io.Raw], channels: Optional[str] = None
+    x: List[mne.io.Raw], channels: Optional[List] = None
 ) -> List[mne.io.Raw]:
     """Select only central channels from a set of EEG electrodes"""
     all_channel_names: List[str] = x[0].info.ch_names
     eeg_channel_names: List[str] = [
         i for i in all_channel_names if i[0] in ["F", "C", "P", "T", "O"]
     ]
+    selectable_channels: Optional[List] = (
+        None if channels is None else [i for i in channels if i in all_channel_names]
+    )
 
     return [
-        i.copy().pick(picks=channels if channels is not None else eeg_channel_names)
+        i.copy().pick(
+            picks=selectable_channels if channels is not None else eeg_channel_names
+        )
         for i in x
     ]
 
