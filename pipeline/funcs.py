@@ -11,7 +11,9 @@ def channel_select(
     x: List[mne.io.Raw], channels: Optional[List] = None
 ) -> List[mne.io.Raw]:
     """Select only central channels from a set of EEG electrodes"""
-    all_channel_names: List[str] = reduce(np.intersect1d, [i.info.ch_names for i in x])
+    all_channel_names: List[str] = reduce(
+        lambda a, b: np.intersect1d(a, b), [i.info.ch_names for i in x]
+    ).tolist()
     eeg_channel_names: List[str] = [
         i for i in all_channel_names if i[0] in ["F", "C", "P", "T", "O"]
     ]
