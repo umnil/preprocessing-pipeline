@@ -1,5 +1,6 @@
 import mne  # type: ignore
 import numpy as np
+from functools import reduce
 from mne import set_eeg_reference  # type: ignore
 from typing import List, Optional, Tuple
 from .masked import TemporalFilter
@@ -10,7 +11,7 @@ def channel_select(
     x: List[mne.io.Raw], channels: Optional[List] = None
 ) -> List[mne.io.Raw]:
     """Select only central channels from a set of EEG electrodes"""
-    all_channel_names: List[str] = x[0].info.ch_names
+    all_channel_names: List[str] = reduce(np.intersect1d, [i.info.ch_names for i in x])
     eeg_channel_names: List[str] = [
         i for i in all_channel_names if i[0] in ["F", "C", "P", "T", "O"]
     ]
