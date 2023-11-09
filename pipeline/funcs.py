@@ -11,14 +11,21 @@ def channel_select(
     x: List[mne.io.Raw], channels: Optional[List] = None
 ) -> List[mne.io.Raw]:
     """Select only central channels from a set of EEG electrodes"""
+
+    # This ensures that only channels that every input file has access to will
+    # be used
     all_channel_names: List[str] = reduce(
         lambda a, b: np.intersect1d(a, b), [i.info.ch_names for i in x]
     ).tolist()
+
+    # Filter down to eeg-only channels
     eeg_channel_names: List[str] = [
         i for i in all_channel_names if i[0] in ["F", "C", "P", "T", "O"]
     ]
+
+    # Perform channel selection if wanted
     selectable_channels: Optional[List] = (
-        None if channels is None else [i for i in channels if i in all_channel_names]
+        None if channels is None else [i for i in channels if i in eeg_channel_names]
     )
 
     return [
