@@ -9,6 +9,7 @@ from .decorrelate import Decorrelate
 from .feature_union import TransformFeatureUnion
 from .function_transformer import FunctionTransformer as TFunctionTransformer
 from .interpolator import Interpolator
+from .lag import Lag
 from .masked import Masker
 from .optional_transformer import OptionalTransformer
 from .pairer import Pairer
@@ -22,6 +23,7 @@ ArtifactRemover
 Decorrelate
 Extractor
 Interpolator
+Lag
 Masker
 NDPCA
 OptionalTransformer
