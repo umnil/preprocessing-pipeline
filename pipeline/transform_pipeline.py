@@ -2,7 +2,7 @@ import inspect
 import pickle
 import numpy as np
 
-from typing import Dict, IO, Sequence, List, Optional, Tuple, cast
+from typing import Dict, IO, Sequence, List, Optional, Tuple, Union, cast
 from datetime import datetime
 
 from sklearn.base import TransformerMixin, clone  # type: ignore
@@ -24,8 +24,38 @@ def _final_estimator_has(attr):
     return check
 
 
+def _separate_mask(
+    X: Sequence, y: Optional[Sequence] = None
+) -> Tuple[Union[Tuple, Sequence], Optional[Union[Tuple, Sequence]]]:
+    x_ret: Union[Tuple, Sequence] = X
+    y_ret: Optional[Union[Tuple, Sequence]] = y
+    if isinstance(X, np.ma.MaskedArray):
+        x_ret = X.data, X.mask
+
+    if isinstance(y, np.ma.MaskedArray):
+        y_ret = y.data, y.mask
+
+    return x_ret, y_ret
+
+
+def _reform_mask(
+    X: Sequence, y: Optional[Sequence] = None
+) -> Tuple[Sequence, Optional[Sequence]]:
+    x_ret: Sequence = X
+    y_ret: Optional[Sequence] = y
+    if isinstance(X, tuple):
+        x_ret = cast(Sequence, np.ma.MaskedArray(*X))
+
+    if isinstance(y, tuple):
+        y_ret = cast(Sequence, np.ma.MaskedArray(*y))
+
+    return x_ret, y_ret
+
+
 class TransformPipeline(Pipeline):
     def _fit(self, X: Sequence, y: Optional[Sequence] = None, **fit_params_steps):
+        # Account for masked arrays
+        X, y = _separate_mask(X, y)
         # shallow copy of steps - this should really be steps_
         self.steps: List = list(self.steps)
         self.results: List[Tuple] = []
@@ -416,6 +446,7 @@ def _fit_transform_one(
     with the fitted transformer. If ``weight`` is not ``None``, the result will
     be multiplied by ``weight``.
     """
+    X, y = _reform_mask(X, y)
     with _print_elapsed_time(message_clsname, message):
         if hasattr(transformer, "fit_transform"):
             res_x = transformer.fit_transform(X, y, **fit_params)
@@ -434,4 +465,6 @@ def _fit_transform_one(
 
     if weight is None:
         return res_x, res_y, transformer
-    return res_x * weight, res_y, transformer
+
+    res_x, res_y = _separate_mask(res_x * weight, res_y)
+    return res_x, res_y, transformer
