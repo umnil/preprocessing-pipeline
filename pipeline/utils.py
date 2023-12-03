@@ -1,5 +1,6 @@
 import numpy as np
-from typing import Iterable, List, Tuple
+from sklearn.base import TransformerMixin  # type: ignore
+from typing import Iterable, List, Optional, Sequence, Tuple, Union, cast
 
 
 def equalize_list_to_array(a: List[np.ndarray], axes: List[int] = [-1]) -> np.ndarray:
@@ -129,6 +130,89 @@ def mask_list(input_list: List) -> np.ndarray:
         return ret
     else:
         return np.array(input_list)
+
+
+def split_mask(value: np.ma.MaskedArray) -> Tuple[np.ndarray, np.ndarray, Tuple, type]:
+    """Convert a masked array into a tuple with details to reform it"""
+    data: np.ndarray = value.data.flatten().view(np.uint8)
+    mask: np.ndarray = value.mask.flatten().astype(np.uint8).view(np.uint8)
+    return data, mask, value.shape, value.dtype
+
+
+def reform_mask(
+    data: np.ndarray, mask: np.ndarray, shape: Tuple, dtype: type
+) -> np.ma.MaskedArray:
+    """Convert details of a split masked array back into a masked array"""
+    return np.ma.MaskedArray(
+        data.astype(np.uint8).view(dtype), mask.astype(np.uint8)
+    ).reshape(shape)
+
+
+def is_split_mask(val) -> bool:
+    """Determine whether a tuple value has sufficient data of a split mask"""
+    if isinstance(val, tuple):
+        if len(val) == 4:
+            a, b, c, d = val
+            at = isinstance(a, np.ndarray)
+            bt = isinstance(b, np.ndarray)
+            ct = isinstance(c, tuple)
+            dt = isinstance(d, type)
+            if at and bt and ct and dt:
+                return True
+
+    return False
+
+
+def split_mask_xy(
+    X: Sequence, y: Optional[Sequence] = None
+) -> Tuple[Union[Tuple, Sequence], Optional[Union[Tuple, Sequence]]]:
+    """Convenience function for simultaneous mask splitting"""
+    x_ret: Union[Tuple, Sequence] = X
+    y_ret: Optional[Union[Tuple, Sequence]] = y
+    if isinstance(X, np.ma.MaskedArray):
+        x_ret = split_mask(X)
+
+    if isinstance(y, np.ma.MaskedArray):
+        y_ret = split_mask(y)
+
+    return x_ret, y_ret
+
+
+def reform_mask_xy(
+    X: Sequence, y: Optional[Sequence] = None
+) -> Tuple[Sequence, Optional[Sequence]]:
+    """Convenience function for simultaneous mask reform"""
+    x_ret: Sequence = X
+    y_ret: Optional[Sequence] = y
+    if isinstance(X, tuple):
+        x_ret = cast(Sequence, reform_mask(*X))
+
+    if isinstance(y, tuple):
+        y_ret = cast(Sequence, reform_mask(*y))
+
+    return x_ret, y_ret
+
+
+def transformer_split_mask(transformer: TransformerMixin) -> TransformerMixin:
+    """Transform all mask attributes in an object"""
+    attr_names: List[str] = [i for i in dir(transformer) if hasattr(transformer, i)]
+    ma_attr_names: List[str] = [
+        i for i in attr_names if isinstance(getattr(transformer, i), np.ma.MaskedArray)
+    ]
+    for attr_name in ma_attr_names:
+        setattr(transformer, attr_name, split_mask(getattr(transformer, attr_name)))
+    return transformer
+
+
+def transformer_reform_mask(transformer: TransformerMixin) -> TransformerMixin:
+    """Transform all split masks back into masks"""
+    attr_names: List[str] = [i for i in dir(transformer) if hasattr(transformer, i)]
+    ma_attr_names: List[str] = [
+        i for i in attr_names if is_split_mask(getattr(transformer, i))
+    ]
+    for attr_name in ma_attr_names:
+        setattr(transformer, attr_name, reform_mask(*getattr(transformer, attr_name)))
+    return transformer
 
 
 def unmask_array(a: np.ndarray) -> List:

@@ -2,7 +2,7 @@ import inspect
 import pickle
 import numpy as np
 
-from typing import Dict, IO, Sequence, List, Optional, Tuple, Union, cast
+from typing import Dict, IO, Sequence, List, Optional, Tuple, cast
 from datetime import datetime
 
 from sklearn.base import TransformerMixin, clone  # type: ignore
@@ -10,6 +10,12 @@ from sklearn.pipeline import Pipeline  # type: ignore
 from sklearn.utils import _print_elapsed_time  # type: ignore
 from sklearn.utils.metaestimators import available_if  # type: ignore
 from sklearn.utils.validation import check_memory  # type: ignore
+from .utils import (
+    split_mask_xy,
+    reform_mask_xy,
+    transformer_split_mask,
+    transformer_reform_mask,
+)
 
 
 def _final_estimator_has(attr):
@@ -24,38 +30,8 @@ def _final_estimator_has(attr):
     return check
 
 
-def _separate_mask(
-    X: Sequence, y: Optional[Sequence] = None
-) -> Tuple[Union[Tuple, Sequence], Optional[Union[Tuple, Sequence]]]:
-    x_ret: Union[Tuple, Sequence] = X
-    y_ret: Optional[Union[Tuple, Sequence]] = y
-    if isinstance(X, np.ma.MaskedArray):
-        x_ret = X.data, X.mask
-
-    if isinstance(y, np.ma.MaskedArray):
-        y_ret = y.data, y.mask
-
-    return x_ret, y_ret
-
-
-def _reform_mask(
-    X: Sequence, y: Optional[Sequence] = None
-) -> Tuple[Sequence, Optional[Sequence]]:
-    x_ret: Sequence = X
-    y_ret: Optional[Sequence] = y
-    if isinstance(X, tuple):
-        x_ret = cast(Sequence, np.ma.MaskedArray(*X))
-
-    if isinstance(y, tuple):
-        y_ret = cast(Sequence, np.ma.MaskedArray(*y))
-
-    return x_ret, y_ret
-
-
 class TransformPipeline(Pipeline):
     def _fit(self, X: Sequence, y: Optional[Sequence] = None, **fit_params_steps):
-        # Account for masked arrays
-        X, y = _separate_mask(X, y)
         # shallow copy of steps - this should really be steps_
         self.steps: List = list(self.steps)
         self.results: List[Tuple] = []
@@ -80,6 +56,9 @@ class TransformPipeline(Pipeline):
             else:
                 cloned_transformer = clone(transformer)
 
+            cloned_transformer = transformer_split_mask(cloned_transformer)
+
+            X, y = split_mask_xy(X, y)
             # Fit or load from cache the current transformer
             X, y, fitted_transformer = fit_transform_one_cached(
                 cloned_transformer,
@@ -90,6 +69,8 @@ class TransformPipeline(Pipeline):
                 message=self._log_message(step_idx),
                 **fit_params_steps[name],
             )
+            X, y = reform_mask_xy(X, y)
+            fitted_transformer = transformer_reform_mask(fitted_transformer)
             # Replace the transformer of the step with the fitted
             # transformer. This is necessary when loading the transformer
             # from the cache.
@@ -446,7 +427,8 @@ def _fit_transform_one(
     with the fitted transformer. If ``weight`` is not ``None``, the result will
     be multiplied by ``weight``.
     """
-    X, y = _reform_mask(X, y)
+    X, y = reform_mask_xy(X, y)
+    transformer = transformer_reform_mask(transformer)
     with _print_elapsed_time(message_clsname, message):
         if hasattr(transformer, "fit_transform"):
             res_x = transformer.fit_transform(X, y, **fit_params)
@@ -463,8 +445,9 @@ def _fit_transform_one(
                 else getattr(transformer, "_y_hat")
             )
 
-    if weight is None:
-        return res_x, res_y, transformer
+    if weight is not None:
+        res_x *= weight
 
-    res_x, res_y = _separate_mask(res_x * weight, res_y)
+    res_x, res_y = split_mask_xy(res_x, res_y)
+    transformer = transformer_split_mask(transformer)
     return res_x, res_y, transformer
