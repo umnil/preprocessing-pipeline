@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn.base import TransformerMixin
+from sklearn.base import TransformerMixin  # type: ignore
 from typing import Iterable, List, Optional, Sequence, Tuple, Union, cast
 
 
@@ -211,7 +211,7 @@ def transformer_reform_mask(transformer: TransformerMixin) -> TransformerMixin:
         i for i in attr_names if is_split_mask(getattr(transformer, i))
     ]
     for attr_name in ma_attr_names:
-        setattr(transformer, attr_name, reform_mask(getattr(transformer, attr_name)))
+        setattr(transformer, attr_name, reform_mask(*getattr(transformer, attr_name)))
     return transformer
 
 
