@@ -1,10 +1,11 @@
 import numpy as np
 
 from mne.decoding import PSDEstimator  # type: ignore
+from sklearn.base import BaseEstimator  # type: ignore
 from typing import List, Tuple
 
 
-class MaskedPSDEstimator(PSDEstimator):
+class MaskedPSDEstimator(PSDEstimator, BaseEstimator):
     # super().__init__()
     def __init__(
         self,
