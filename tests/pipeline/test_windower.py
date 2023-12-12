@@ -139,7 +139,7 @@ class TestWindower:
         # Unconcatenated 3
         data, labels = create_mock_data()
         windower = Windower(samples_per_window=500, label_scheme=3, window_step=250)
-        x = windower.fit_transform(data, labels)
+        x = cast(np.ma.core.MaskedArray, windower.fit_transform(data, labels))
         assert x.shape == (3, 10, 19, 500)
         mask_axis = 2
         s = x.shape
@@ -165,7 +165,7 @@ class TestWindower:
 
         # Unconcatenated 3
         windower = Windower(samples_per_window=500, label_scheme=3, window_step=250)
-        x = windower.fit_transform(data, labels)
+        x = cast(np.ma.core.MaskedArray, windower.fit_transform(data, labels))
         assert x.shape == (3, 10, 19, 500)
         s = list(x.shape)
         s[-2] = -1

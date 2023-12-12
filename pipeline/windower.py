@@ -1,8 +1,8 @@
 import logging
 import numpy as np
 
-from typing import Callable, List, Tuple, Union, cast
-from scipy import stats
+from typing import Callable, List, cast
+from scipy import stats  # type: ignore
 from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
 from . import utils
 
@@ -66,9 +66,10 @@ class Windower(TransformerMixin, BaseEstimator):
         self._window_packets: np.ndarray = np.array([])
         self.return_masked: bool = return_masked
         self.axis: int = axis
-        self.window_fn: Callable = (
-            self._window_transform if self.label_scheme < 4 else self._split_transform
-        )
+
+        fn1: Callable = self._window_transform
+        fn2: Callable = self._split_transform
+        self.window_fn: Callable = fn1 if self.label_scheme < 4 else fn2
 
         # Uninitialized variables to be defined later
         self._n: int
@@ -179,16 +180,22 @@ class Windower(TransformerMixin, BaseEstimator):
         a_fl: np.ndarray = a_ax.reshape(-1, n)
 
         # generate mask
-        mask_fl: np.ndarray = np.array([[~np.all(i[0] == i)] * i.size for i in a_fl])
+        mask_fl: np.ndarray = np.array([[not np.all(i[0] == i)] * i.size for i in a_fl])
+
+        if isinstance(a_fl, np.ma.core.MaskedArray):
+            mask_fl += a_fl.mask
+            a_fl = a_fl.data
 
         # mask
         m_fl: np.ma.core.MaskedArray = np.ma.array(a_fl, mask=mask_fl)
 
         # reshape
-        m_ax: np.ndarray = m_fl.reshape(*a_ax.shape)
+        m_ax: np.ma.core.MaskedArray = m_fl.reshape(*a_ax.shape)
 
         # reset
-        m: np.ndarray = np.moveaxis(m_ax, -1, axis)
+        m: np.ma.core.MaskedArray = cast(
+            np.ma.core.MaskedArray, np.moveaxis(m_ax, -1, axis)
+        )
         return m
 
     def _split_transform(self, *a) -> List:
@@ -226,11 +233,11 @@ class Windower(TransformerMixin, BaseEstimator):
             xt: np.ma.core.MaskedArray = np.ma.masked_invalid(
                 utils.equalize_list_to_array(x_list, axes=[0, -1])
             )
-            xt = np.moveaxis(xt, 1, -2)
+            xt = cast(np.ma.core.MaskedArray, np.moveaxis(xt, 1, -2))
             results.append(xt)
         return results
 
-    def _window_transform(self, *a, axis: int = -1) -> np.ndarray:
+    def _window_transform(self, *a, axis: int = -1) -> List:
         """Performs a windowing transformation on an array across the given
         axis. Note that the resulting array will have `a.ndim + 1` number of
         dimensions to account for the windows. So if `a` has a shape of (5, 10,
@@ -268,12 +275,12 @@ class Windower(TransformerMixin, BaseEstimator):
             # Apply the indices and check for masking
             data: np.ndarray
             mask: np.ndarray
-            if isinstance(a, np.ma.core.MaskedArray):
+            if isinstance(x, np.ma.core.MaskedArray):
                 data = x.data
                 mask = x.mask
                 data = np.stack([data[..., i] for i in window_idxs])
                 mask = np.stack([mask[..., i] for i in window_idxs])
-                x = np.masked_array(data, mask)
+                x = np.ma.masked_array(data, mask)
             else:
                 data = x
                 data = np.stack([data[..., i] for i in window_idxs])
@@ -358,8 +365,8 @@ class Windower(TransformerMixin, BaseEstimator):
                 yt_prelabel, self.axis
             )
             n_ch: int = xt.shape[1]
-            xt_mask_shift: np.array = np.array([yt_masked.mask] * n_ch)
-            xt_mask: np.array = np.moveaxis(xt_mask_shift, 0, 1)
+            xt_mask_shift: np.ndarray = np.array([yt_masked.mask] * n_ch)
+            xt_mask: np.ndarray = np.moveaxis(xt_mask_shift, 0, 1)
             xt_masked: np.ma.core.MaskedArray = np.ma.array(xt, mask=xt_mask)
 
             yt = yt_masked[..., 0]
@@ -372,4 +379,4 @@ class Windower(TransformerMixin, BaseEstimator):
 
         self._x_hat = xt
         self._y_hat = yt
-        return self._x_hat
+        return xt
