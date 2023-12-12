@@ -1,7 +1,8 @@
 import logging
 import numpy as np
 
-from typing import List, Tuple, Union, cast
+from typing import Callable, List, Tuple, Union, cast
+from scipy import stats
 from sklearn.base import TransformerMixin, BaseEstimator  # type: ignore
 from . import utils
 
@@ -65,6 +66,9 @@ class Windower(TransformerMixin, BaseEstimator):
         self._window_packets: np.ndarray = np.array([])
         self.return_masked: bool = return_masked
         self.axis: int = axis
+        self.window_fn: Callable = (
+            self._window_transform if self.label_scheme < 4 else self._split_transform
+        )
 
         # Uninitialized variables to be defined later
         self._n: int
@@ -74,107 +78,159 @@ class Windower(TransformerMixin, BaseEstimator):
         self._y: np.ndarray
         self._x: np.ndarray
 
-    def _make_labels(self, y: np.ndarray) -> np.ndarray:
-        """Generate new labels for each window
+    @staticmethod
+    def _compute_split_indices(a: np.ndarray, axis: int = -1) -> List:
+        """Return a list of window indices to split the data against. The
+        return type is a list, instead of a numpy array, because splitting does
+        not constrain the windowing to a fixed size, so the numpy matrix would
+        not be square
 
         Parameters
         ----------
-        y : np.ndarray
-            An multidimensional input array of the labels to be transformed
+        a : np.ndarray
+            The input array with data to split by. Data will be split such that
+            each data split will have samples that are equivlant. In other
+            words, data are only split across time a points when sample values
+            change
+        axis : int
+            The axis to consider as the time axis
+        """
+        assert (
+            a.ndim == 1
+        ), "Windowing by label requiers that the labels are 1 dimensional"
+        delta: np.ndarray = np.diff(a)
+        transitions: np.ndarray = np.where((delta != 0) * (~np.isnan(delta)))[-1] + 1
+        delta_idxs: np.ndarray = np.array([0] + transitions.tolist() + [a.size])
+        window_list_idxs: List = [
+            np.arange(a, b) for a, b in zip(delta_idxs[:-1], delta_idxs[1:])
+        ]
+        return window_list_idxs
+
+    @staticmethod
+    def _compute_window_indices(
+        a: np.ndarray, step_size: int, window_size: int, axis: int = -1
+    ) -> np.ndarray:
+        """Return a matrix of indices that can be applyed to a to result in a windowed
+        version of a
+
+        Parameters
+        ----------
+        a : np.ndarray
+            The input matrix
+        step_size : int
+            The number of samples to move the window forward for each window
+        window_size : int
+            The number of samples per window
+        axis : int
+            The axis along which to window the data
+        """
+        # normalize axis
+        axis = axis if axis >= 0 else a.ndim + axis
+
+        # calculate the number of windows
+        t: int = a.shape[axis]
+        n_win: int = int(t / step_size)
+
+        # n_win +1 to ensure we go *over* the time. We'll cut off later
+        window_start_idxs = np.linspace(0, t, n_win + 1).astype(np.int32)
+        window_idxs = np.array(
+            [np.arange(s, s + window_size) for s in window_start_idxs]
+        )
+
+        # Here we cut back any access beyond the time
+        window_idxs = np.array([idxs for idxs in window_idxs if ~np.any(idxs > t)])
+        return window_idxs
+
+    @staticmethod
+    def _compute_lengths(a: np.ndarray) -> np.ndarray:
+        """Compute the lengths. The input should be a 3D array of shape (runs,
+        windows, time). The resulting output is an array of n_runs, where each
+        element lists the number of windows. Used for time-series models such
+        as hidden markov models"""
+        if not isinstance(a, np.ma.core.MaskedArray):
+            length_list: List = [len(i) for i in a]
+            return np.array(length_list)
+        else:
+            length_list = [np.sum(~run.mask) for run in a]
+            return np.array(length_list)
+
+    @staticmethod
+    def _mask_heterogenous_axis(
+        a: np.ndarray, axis: int = -1
+    ) -> np.ma.core.MaskedArray:
+        """Given a multi-dimension array, mask the array along the axis if the
+        values along that axis for each instance are not homogenous
+
+        Parameters
+        ----------
+        a : np.ndarray
+            The input array
 
         Returns
         -------
         np.ndarray
-            an Wx1 input array were W is the number of windows
+            The masked array
         """
-        self._n = y.shape[self.axis]
-        y, win_idxs = self._window_transform(y, self.axis, True)
-        self._window_idxs = win_idxs
+        # move axis to the back
+        a_ax: np.ndarray = np.moveaxis(a, axis, -1)
 
-        # Apply labelling scheme
-        if self.label_scheme == 0:
-            # Only use the first packet label
-            y_transformed = y[..., 0]
-        elif self.label_scheme == 1:
-            # Only use the last packet label
-            y_transformed = y[..., -1]
-        elif self.label_scheme == 2:
-            # Most common label
-            flattened_y: np.ndarray = y.reshape(-1, self.samples_per_window)
-            counts: List = [np.unique(i, return_counts=True) for i in flattened_y]
-            flattened_y = np.stack([i[0][np.argmax(i[1])] for i in counts])
-            y = flattened_y.reshape(*y.shape[:-1])
-            y_transformed = y.squeeze()
-        elif self.label_scheme == 3:
-            # Non-ambiguous
-            if self.return_masked:
-                mask: np.ndarray = np.zeros(y.shape)
-                flattened_y = y.reshape(-1, self.samples_per_window)
-                mask = mask.reshape(flattened_y.shape)
-                i: np.ndarray = np.array(
-                    [i for i, a, in enumerate(flattened_y) if len(set(a)) < 2]
-                )
-                j: np.ndarray = np.zeros(i.size).astype(np.int32)
-                mask[i, j] = 1
-                mask = mask.reshape(y.shape).astype(bool)
-                y = np.ma.MaskedArray(data=y, mask=~mask)[..., 0]
-            else:
-                y = utils.mask_list(
-                    [[win[0] for win in inst if len(set(win)) < 2] for inst in y]
-                )
+        # flatten
+        n: int = a_ax.shape[-1]
+        a_fl: np.ndarray = a_ax.reshape(-1, n)
 
-            y_transformed = y.squeeze()
-            if y_transformed.ndim < 2:
-                y_transformed = y_transformed[None, ...]
+        # generate mask
+        mask_fl: np.ndarray = np.array([[~np.all(i[0] == i)] * i.size for i in a_fl])
 
-        elif self.label_scheme == 4:
-            # Windows by labels
-            y = self._y
-            y = utils.mask_list([cast(np.ndarray, self._window_by_label(i)) for i in y])
-            y_transformed = y
+        # mask
+        m_fl: np.ma.core.MaskedArray = np.ma.array(a_fl, mask=mask_fl)
 
-        self._n_windows = y_transformed.shape[0]
-        return y_transformed
+        # reshape
+        m_ax: np.ndarray = m_fl.reshape(*a_ax.shape)
 
-    @staticmethod
-    def _window_by_label(
-        labels: np.ndarray, return_indices: bool = False
-    ) -> Union[np.ndarray, Tuple[np.ndarray, List]]:
+        # reset
+        m: np.ndarray = np.moveaxis(m_ax, -1, axis)
+        return m
+
+    def _split_transform(self, *a) -> List:
         """Create windows over labels such that each window is a unique set of
         values within labels. The order of the windows are as the values appear
         in labels. Labels is expected to be one dimensional
 
         Parameters
         ----------
-        labels : np.ndarray
-            The labels to window
-        return_indices : bool
-            If True, return the windowing indices that can be used to rewindow
-            the original data
+        x : np.ndarray
+            The data to window
+        ... : np.ndarray
+            Other arrays to apply the windowing to
+        y : np.ndarray
+            The array which will determine the indexing
 
         Return
         ------
-        np.ndarray
-            The 2d windowed array
-        List
-            A list of windowing indices. Only returned if `return_indices` is true
+        xt, yt, ...
+            A list of transformed datasets
         """
-        assert (
-            labels.ndim == 1
-        ), "Windowing by label requiers that the labels are 1 dimensional"
-        delta: np.ndarray = np.diff(labels)
-        transitions: np.ndarray = np.where((delta != 0) * (~np.isnan(delta)))[-1] + 1
-        delta_idxs: np.ndarray = np.array([0] + transitions.tolist() + [labels.size])
-        window_list_idxs: List = [
-            np.arange(a, b) for a, b in zip(delta_idxs[:-1], delta_idxs[1:])
-        ]
-        labels_list: List = [labels[i] for i in window_list_idxs]
-        labels = utils.mask_list(labels_list)
-        return labels[:, 0] if not return_indices else (labels[:, 0], window_list_idxs)
+        labels: np.ndarray = a[-1]
+        window_list_idxs: List = [self._compute_split_indices(run) for run in labels]
+        results = []
+        for ix, x in enumerate(a):
+            assert x.ndim <= 3, "Only 3 dimensional (run, channel, time), is supported"
+            assert x.shape[0] == len(
+                window_list_idxs
+            ), "mismatch in number of runs in datasets"
+            x_list: List = [
+                utils.equalize_list_to_array([runx[..., i] for i in runi])
+                for runx, runi in zip(x, window_list_idxs)
+            ]
+            # Shape is now (run, window, ..., time)
+            xt: np.ma.core.MaskedArray = np.ma.masked_invalid(
+                utils.equalize_list_to_array(x_list, axes=[0, -1])
+            )
+            xt = np.moveaxis(xt, 1, -2)
+            results.append(xt)
+        return results
 
-    def _window_transform(
-        self, a: np.ndarray, axis: int = -1, return_indices: bool = False
-    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    def _window_transform(self, *a, axis: int = -1) -> np.ndarray:
         """Performs a windowing transformation on an array across the given
         axis. Note that the resulting array will have `a.ndim + 1` number of
         dimensions to account for the windows. So if `a` has a shape of (5, 10,
@@ -183,52 +239,62 @@ class Windower(TransformerMixin, BaseEstimator):
 
         Parameters
         ----------
-        a : np.ndarray
+        x : np.ndarray
             The input array to perform the windowing on
+        ...
+        y : np.ndarray
+            Final input array to perform windowing on
         axis : int
             The axis within `a` across which to perform windowing
-        return_indices : bool
-            If true, returns the indcies used to index the windows from the
-            original input array
 
         Returns
         -------
-        np.ndarray
-            The windowed array
+        List
+            The list of windowed arrays, plust the lengths of runs
         """
-        # normalize axis
-        axis = axis if axis >= 0 else a.ndim + axis
+        results: List = []
+        for x in a:
+            # normalize axis
+            target_axis = axis if axis >= 0 else x.ndim + axis
+            # Move working axis to the back
+            x = np.moveaxis(x, target_axis, -1)
+            t: int = x.shape[-1]
 
-        # Move working axis to the back
-        a = np.moveaxis(a, axis, -1)
+            # compute the window indices to window the data
+            window_idxs: np.ndarray = self._compute_window_indices(
+                x, self.window_step, self.samples_per_window, target_axis
+            )
 
-        # calculate the number of windows
-        t: int = a.shape[-1]
-        n_win: int = int(t / self.window_step)
+            # Apply the indices and check for masking
+            data: np.ndarray
+            mask: np.ndarray
+            if isinstance(a, np.ma.core.MaskedArray):
+                data = x.data
+                mask = x.mask
+                data = np.stack([data[..., i] for i in window_idxs])
+                mask = np.stack([mask[..., i] for i in window_idxs])
+                x = np.masked_array(data, mask)
+            else:
+                data = x
+                data = np.stack([data[..., i] for i in window_idxs])
+                x = data
 
-        # n_win +1 to ensure we go *over* the time. We'll cut off later
-        window_start_idxs = np.linspace(0, t, n_win + 1).astype(np.int32)
-        window_idxs = np.array(
-            [np.arange(s, s + self.samples_per_window) for s in window_start_idxs]
-        )
+            # shape should now be (n_win, ..., n_time)
+            expected_n_windows: int = int(
+                (t - self.samples_per_window) / self.window_step + 1
+            )
+            # where n_time = samples_per_window
+            assert x.shape[0] == expected_n_windows, (
+                "Failed to window the data."
+                f"Expected {expected_n_windows}, but got {x.shape[0]}"
+            )
+            assert x.shape[-1] == self.samples_per_window
 
-        # Here we cut back any access beyond the time
-        window_idxs = np.array([idxs for idxs in window_idxs if ~np.any(idxs > t)])
-        a = np.stack([a[..., i] for i in window_idxs])
-        # shape should now be (n_win, ..., n_time)
-        # where n_time = samples_per_window
-        expected_n_windows: int = int(
-            (t - self.samples_per_window) / self.window_step + 1
-        )
-        assert a.shape[0] == expected_n_windows, (
-            "Failed to window the data."
-            f"Expected {expected_n_windows}, but got {a.shape[0]}"
-        )
-        assert a.shape[-1] == self.samples_per_window
+            # replace time axis. Shape should now be (... n_windows, n_time)
+            x = np.moveaxis(x, 0, target_axis)
+            results.append(x)
 
-        # replace time axis. Shape should now be (... n_windows, n_time)
-        a = np.moveaxis(a, 0, axis)
-        return a if not return_indices else (a, window_idxs)
+        return results
 
     def fit(self, x: np.ndarray, y: np.ndarray, **fit_params) -> "Windower":
         """Given an n-dimensional matrix `x`, the time-dimension, indicated by
@@ -275,58 +341,35 @@ class Windower(TransformerMixin, BaseEstimator):
         assert x.ndim > 1, "x labels must be at least two dimensions"
         self._t = np.prod(np.array(x.shape)[self.axis])
         self._y = y
-        self._y_hat = self._make_labels(y)
-        self._y_lengths = [
-            i.data[~i.mask].shape[0]
-            for i in np.ma.masked_invalid(
-                self._y_hat if self._y_hat.ndim > 1 else self._y_hat[None, ...]
+
+        # Apply windowing
+        xt, yt_prelabel = self.window_fn(x, y)
+        assert yt_prelabel.ndim == 3
+
+        # Apply Labeling Scheme
+        if self.label_scheme == 0:
+            yt: np.ndarray = yt_prelabel[..., 0]
+        elif self.label_scheme == 1:
+            yt = yt_prelabel[..., -1]
+        elif self.label_scheme == 2:
+            yt = stats.mode(yt_prelabel, axis=-1)
+        elif self.label_scheme == 3:
+            yt_masked: np.ma.core.MaskedArray = self._mask_heterogenous_axis(
+                yt_prelabel, self.axis
             )
-        ]
-        # place all time axes in the back and all other axes up front
-        # Flatten the back so that time is linear across all other axes
-        dim_list: np.ndarray = np.arange(x.ndim)
-        x = np.moveaxis(x, self.axis, -1)
-        x = x.reshape(*x.shape[:-1], -1)
-        dim_list[[-1, self.axis]] = dim_list[[self.axis, -1]]
+            n_ch: int = xt.shape[1]
+            xt_mask_shift: np.array = np.array([yt_masked.mask] * n_ch)
+            xt_mask: np.array = np.moveaxis(xt_mask_shift, 0, 1)
+            xt_masked: np.ma.core.MaskedArray = np.ma.array(xt, mask=xt_mask)
 
-        if self.label_scheme < 4:
-            x = cast(np.ndarray, self._window_transform(x))
-            x = np.moveaxis(x, dim_list, np.arange(dim_list.size))
-            if self.label_scheme == 3:
-                # Calculate label transformation
-                y = cast(np.ndarray, self._window_transform(self._y, self.axis))
+            yt = yt_masked[..., 0]
+            xt = xt_masked
+        elif self.label_scheme == 4:
+            yt = yt_prelabel[..., 0]
 
-                # Reshape to known axes (n, n_win, ...)
-                x = np.moveaxis(x, self.axis - 1, 1)
-                if self.return_masked:
-                    flattened_x: np.ndarray = x.reshape(-1, *x.shape[2:])
-                    flattened_y: np.ndarray = y.reshape(-1, self.samples_per_window)
-                    mask: np.ndarray = np.zeros(flattened_x.shape)
-                    i: np.ndarray = np.array(
-                        [i for i, a in enumerate(flattened_y) if len(set(a)) < 2]
-                    )
-                    mask[i, ...] = 1
-                    mask = mask.reshape(x.shape).astype(bool)
-                    x = np.ma.MaskedArray(data=x, mask=~mask)
-                else:
-                    x = utils.mask_list(
-                        [
-                            [xwin for xwin, ywin in zip(xi, yi) if len(set(ywin)) < 2]
-                            for xi, yi in zip(x, y)
-                        ]
-                    )
+        # Compute lengths
+        self._y_lengths = self._compute_lengths(yt)
 
-                # Reseparate the n and windowing axes
-                x = np.moveaxis(x, 1, self.axis - 1)
-        else:
-            y = self._y
-            idxs = [self._window_by_label(i, True)[1] for i in y]
-            # Apply windows
-            x_win = [[a[..., i] for i in idx] for a, idx in zip(x, idxs)]
-            x_time = [utils.equalize_list_to_array(a) for a in x_win]
-            x = utils.equalize_list_to_array(x_time, axes=[0, -1])
-            x = np.moveaxis(x, 1, self.axis - 1)
-
-        self._x = x
-
-        return self._x
+        self._x_hat = xt
+        self._y_hat = yt
+        return self._x_hat
