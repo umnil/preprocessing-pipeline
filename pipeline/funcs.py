@@ -115,3 +115,19 @@ def good_channels(x: List[mne.io.Raw]) -> List[mne.io.Raw]:
     return [
         i.copy().pick(np.setdiff1d(i.info.ch_names, i.info["bads"]).tolist()) for i in x
     ]
+
+
+def pwr(x: np.ndarray) -> np.ndarray:
+    """Compute the power scale of a spectral density
+
+    Parameters
+    ----------
+    x : np.ndarray
+        A matrix where the last dimension a spectral density
+
+    Returns
+    -------
+    np.ndarray
+        The same ax x transformed
+    """
+    return -20 * np.log10(x + 1e-15)

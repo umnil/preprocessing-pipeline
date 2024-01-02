@@ -79,6 +79,7 @@ class NDCSP(BaseEstimator, TransformerMixin):
         """
 
         # Initialize n CSP instances for each filter bank
+        x = x.astype(np.float64)
         self.init_csps(x)
         x, yt = self.prep_input(x, y)
         y = cast(np.ndarray, yt)
@@ -603,6 +604,7 @@ class NDCSP(BaseEstimator, TransformerMixin):
         np.ndarray
             The transformed data
         """
+        x = x.astype(np.float64)
         input_shape: Tuple = x.shape
         input_mask: Optional[np.ndarray] = (
             None if not isinstance(x, np.ma.core.MaskedArray) else x.mask
