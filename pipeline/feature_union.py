@@ -1,6 +1,7 @@
 import numpy as np
 
 from sklearn.pipeline import FeatureUnion  # type: ignore
+from sklearn.utils.metadata_routing import _routing_enabled  # type: ignore
 from .transform_pipeline import _transform_one, _fit_transform_one
 
 try:
@@ -10,7 +11,7 @@ except ModuleNotFoundError:
 
 
 class TransformFeatureUnion(FeatureUnion):
-    def fit_transform(self, x, y=None, **fit_params):
+    def fit_transform(self, x, y=None, **params):
         """Fit all transformers, transform the data and concatenate results.
 
         Parameters
@@ -21,7 +22,7 @@ class TransformFeatureUnion(FeatureUnion):
         y : array-like of shape (n_samples, n_outputs), default=None
             Targets for supervised learning.
 
-        **fit_params : dict, default=None
+        **params : dict, default=None
             Parameters to pass to the fit method of the estimator.
 
         Returns
