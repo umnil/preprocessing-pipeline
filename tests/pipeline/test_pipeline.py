@@ -1,11 +1,10 @@
 import os
 import pandas as pd  # type: ignore
 
-from pipeline import preprocessor
+from preprocessingpipeline import preprocessor
 
 
 class TestPipeline:
-
     pipeline_dir: str = os.path.dirname(__file__)
     test_dir: str = os.path.join(pipeline_dir, "..")
     data_dir: str = os.path.join(test_dir, "data")

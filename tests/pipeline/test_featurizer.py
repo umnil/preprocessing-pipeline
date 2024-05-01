@@ -4,10 +4,10 @@ import pandas as pd  # type: ignore
 
 from typing import Dict, Tuple
 from scipy.fft import fft, fftfreq  # type: ignore
-from pipeline.inline.extractor import Extractor
-from pipeline.inline.windower import Windower
-from pipeline.inline.filter import Filterer
-from pipeline.inline.featurizer import Featurizer
+from preprocessingpipeline.inline.extractor import Extractor
+from preprocessingpipeline.inline.windower import Windower
+from preprocessingpipeline.inline.filter import Filterer
+from preprocessingpipeline.inline.featurizer import Featurizer
 
 
 def fftfilt(data, *args, **kwargs) -> Tuple[np.ndarray, np.ndarray]:

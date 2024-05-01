@@ -36,7 +36,12 @@ def _final_estimator_has(attr):
 
 
 class TransformPipeline(Pipeline):
-    def _fit(self, X: Sequence, y: Optional[Sequence] = None, **fit_params_steps):
+    def _fit(
+        self,
+        X: Sequence,
+        y: Optional[Sequence] = None,
+        routed_params: Optional[Dict] = None,
+    ) -> Tuple:
         # shallow copy of steps - this should really be steps_
         self.steps: List = list(self.steps)
         self.results: List[Tuple] = []
@@ -72,7 +77,7 @@ class TransformPipeline(Pipeline):
                 None,
                 message_clsname="Pipeline",
                 message=self._log_message(step_idx),
-                **fit_params_steps[name],
+                params=routed_params[name] if routed_params is not None else None,
             )
             X, y = reform_mask_xy(X, y)
             fitted_transformer = transformer_reform_mask(fitted_transformer)
@@ -227,7 +232,7 @@ class TransformPipeline(Pipeline):
         # metadata routing enabled
         routed_params = process_routing(self, "predict", **params)
         for _, name, transform in self._iter(with_final=False):
-            has_y_param: bool = "y" in inspect.signature(transform.transform).parameters
+            has_y_param = "y" in inspect.signature(transform.transform).parameters
             if has_y_param is not None:
                 xt = transform.transform(xt, yt, **routed_params[name].transform)
                 yt = (
@@ -301,7 +306,7 @@ class TransformPipeline(Pipeline):
         # metadata routing enabled
         routed_params = process_routing(self, "predict_proba", **params)
         for _, name, transform in self._iter(with_final=False):
-            has_y_param: bool = "y" in inspect.signature(transform.transform).parameters
+            has_y_param = "y" in inspect.signature(transform.transform).parameters
             if has_y_param:
                 xt = transform.transform(xt, yt, **routed_params[name].transform)
                 yt = (
@@ -513,25 +518,28 @@ def _transform_one(
 
 
 def _fit_transform_one(
-    transformer, X, y, weight, message_clsname="", message=None, **fit_params
+    transformer, X, y, weight, message_clsname="", message=None, params=None
 ):
     """
     Fits ``transformer`` to ``X`` and ``y``. The transformed result is returned
     with the fitted transformer. If ``weight`` is not ``None``, the result will
     be multiplied by ``weight``.
     """
+    params = params or {}
     X, y = reform_mask_xy(X, y)
     transformer = transformer_reform_mask(transformer)
     with _print_elapsed_time(message_clsname, message):
         if hasattr(transformer, "fit_transform"):
-            res_x = transformer.fit_transform(X, y, **fit_params)
+            res_x = transformer.fit_transform(X, y, **params.get("fit_transform", {}))
             res_y = (
                 y
                 if not hasattr(transformer, "_y_hat")
                 else getattr(transformer, "_y_hat")
             )
         else:
-            res_x = transformer.fit(X, y, **fit_params).transform(X)
+            res_x = transformer.fit(X, y, **params.get("fit", {})).transform(
+                X, **params.get("transform", {})
+            )
             res_y = (
                 y
                 if not hasattr(transformer, "_y_hat")

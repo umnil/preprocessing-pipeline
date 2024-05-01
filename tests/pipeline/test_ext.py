@@ -1,7 +1,7 @@
 import os
 import pandas as pd  # type: ignore
 
-from pipeline.ext import calc_wcs
+from preprocessingpipeline.ext import calc_wcs
 
 
 class TestExt:
