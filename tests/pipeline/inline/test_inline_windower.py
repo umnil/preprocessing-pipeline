@@ -124,6 +124,7 @@ class TestWindower:
         # Non-uniform windowing
         ex: Extractor = Extractor()
         wn = Windower(trial_size=750, label_scheme=4)
+        ex
         # with open(self.data_filepath, "rb") as fh:
         # sample_data = pickle.load(fh)
         # y = sample_data["prompt"].values
