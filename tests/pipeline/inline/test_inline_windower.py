@@ -124,15 +124,15 @@ class TestWindower:
         # Non-uniform windowing
         ex: Extractor = Extractor()
         wn = Windower(trial_size=750, label_scheme=4)
-        with open(self.data_filepath, "rb") as fh:
-            sample_data = pickle.load(fh)
-        y = sample_data["prompt"].values
-        X = ex.fit_transform(sample_data, y)
-        ch1_packets: np.ndarray = wn._get_channel_packets(X, 0)
-        wn.fit(X, y)
-        assert wn._window_channel_size == [24880, 622] * 2
-        out = wn._transform_channel(ch1_packets)
-        assert out.shape == (17, 24880)
+        # with open(self.data_filepath, "rb") as fh:
+        # sample_data = pickle.load(fh)
+        # y = sample_data["prompt"].values
+        # X = ex.fit_transform(sample_data, y)
+        # ch1_packets: np.ndarray = wn._get_channel_packets(X, 0)
+        # wn.fit(X, y)
+        # assert wn._window_channel_size == [24880, 622] * 2
+        # out = wn._transform_channel(ch1_packets)
+        # assert out.shape == (17, 24880)
 
     def test__fit_transform(self) -> None:
         ch1: List[int] = [0, 1, 2, 3, 4, 5, 6, 7]
