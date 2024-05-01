@@ -2,11 +2,11 @@ import os
 import numpy as np
 import pandas as pd  # type: ignore
 
-from pipeline.inline.extractor import Extractor
-from pipeline.inline.featurizer import Featurizer
-from pipeline.inline.filter import Filterer
-from pipeline.inline.psdbinner import PSDBinner
-from pipeline.inline.windower import Windower
+from preprocessingpipeline.inline.extractor import Extractor
+from preprocessingpipeline.inline.featurizer import Featurizer
+from preprocessingpipeline.inline.filter import Filterer
+from preprocessingpipeline.inline.psdbinner import PSDBinner
+from preprocessingpipeline.inline.windower import Windower
 from typing import List
 
 

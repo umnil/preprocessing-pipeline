@@ -9,6 +9,11 @@ from sklearn.base import TransformerMixin, clone  # type: ignore
 from sklearn.pipeline import Pipeline  # type: ignore
 from sklearn.utils import _print_elapsed_time  # type: ignore
 from sklearn.utils.metaestimators import available_if  # type: ignore
+from sklearn.utils.metadata_routing import (  # type: ignore
+    _raise_for_params,
+    _routing_enabled,
+    process_routing,
+)
 from sklearn.utils.validation import check_memory  # type: ignore
 from .utils import (
     split_mask_xy,
@@ -31,7 +36,12 @@ def _final_estimator_has(attr):
 
 
 class TransformPipeline(Pipeline):
-    def _fit(self, X: Sequence, y: Optional[Sequence] = None, **fit_params_steps):
+    def _fit(
+        self,
+        X: Sequence,
+        y: Optional[Sequence] = None,
+        routed_params: Optional[Dict] = None,
+    ) -> Tuple:
         # shallow copy of steps - this should really be steps_
         self.steps: List = list(self.steps)
         self.results: List[Tuple] = []
@@ -67,7 +77,7 @@ class TransformPipeline(Pipeline):
                 None,
                 message_clsname="Pipeline",
                 message=self._log_message(step_idx),
-                **fit_params_steps[name],
+                params=routed_params[name] if routed_params is not None else None,
             )
             X, y = reform_mask_xy(X, y)
             fitted_transformer = transformer_reform_mask(fitted_transformer)
@@ -80,7 +90,7 @@ class TransformPipeline(Pipeline):
                 self._y_lengths = getattr(fitted_transformer, "_y_lengths")
         return X, y
 
-    def fit(self, X: Sequence, y: Optional[Sequence] = None, **fit_params):
+    def fit(self, X: Sequence, y: Optional[Sequence] = None, **params):
         """Fit the model.
         Fit all the transformers one after the other and transform the
         data. Finally, fit the transformed data using the final estimator.
@@ -93,7 +103,7 @@ class TransformPipeline(Pipeline):
         y : Sequence, default=None
             Training targets. Must fulfill label requirements for all steps of
             the pipeline.
-        **fit_params : dict of string -> object
+        **params : dict of string -> object
             Parameters passed to the ``fit`` method of each step, where
             each parameter name is prefixed such that parameter ``p`` for step
             ``s`` has key ``s__p``.
@@ -103,21 +113,21 @@ class TransformPipeline(Pipeline):
         self : object
             Pipeline with fitted steps.
         """
-        fit_params_steps = self._check_fit_params(**fit_params)
+        routed_params = self._check_method_params(method="fit", props=params)
         Xt: np.ndarray
         yt: np.ndarray
-        Xt, yt = self._fit(X, y, **fit_params_steps)
+        Xt, yt = self._fit(X, y, routed_params)
         with _print_elapsed_time("Pipeline", self._log_message(len(self.steps) - 1)):
             if self._final_estimator != "passthrough":
-                fit_params_last_step = fit_params_steps[self.steps[-1][0]]
+                last_step_params = routed_params[self.steps[-1][0]]
                 if hasattr(self._final_estimator, "use_lengths"):
-                    fit_params_last_step.update({"lengths": self._y_lengths})
-                self._final_estimator.fit(Xt, yt, **fit_params_last_step)
+                    last_step_params.update({"lengths": self._y_lengths})
+                self._final_estimator.fit(Xt, yt, **last_step_params["fit"])
 
         return self
 
     def fit_transform(
-        self, X: Sequence, y: Optional[Sequence] = None, **fit_params
+        self, X: Sequence, y: Optional[Sequence] = None, **params
     ) -> Sequence:
         """Fit the model and transform with the final estimator.
         Fits all the transformers one after the other and transform the
@@ -131,7 +141,7 @@ class TransformPipeline(Pipeline):
         y : iterable, default=None
             Training targets. Must fulfill label requirements for all steps of
             the pipeline.
-        **fit_params : dict of string -> object
+        **params : dict of string -> object
             Parameters passed to the ``fit`` method of each step, where
             each parameter name is prefixed such that parameter ``p`` for step
             ``s`` has key ``s__p``.
@@ -141,28 +151,30 @@ class TransformPipeline(Pipeline):
             Typically ndarray of shape (n_samples, n_transformed_features)
             Transformed samples.
         """
-        fit_params_steps = self._check_fit_params(**fit_params)
-        Xt, yt = self._fit(X, y, **fit_params_steps)
+        routed_params = self._check_method_params(method="fit_transform", props=params)
+        Xt, yt = self._fit(X, y, routed_params)
 
         last_step = self._final_estimator
         with _print_elapsed_time("Pipeline", self._log_message(len(self.steps) - 1)):
             if last_step == "passthrough":
                 return Xt, yt
-            fit_params_last_step = fit_params_steps[self.steps[-1][0]]
+            last_step_params = routed_params[self.steps[-1][0]]
             if hasattr(self, "use_lengths"):
                 if self.use_lengths:
-                    fit_params_last_step.update({"lengths": self._y_lengths})
+                    last_step_params.update({"lengths": self._y_lengths})
             if hasattr(last_step, "fit_transform"):
-                x_hat = last_step.fit_transform(Xt, yt, **fit_params_last_step)
+                x_hat = last_step.fit_transform(Xt, yt, **last_step_params["fit"])
             else:
-                x_hat = last_step.fit(Xt, yt, **fit_params_last_step).transform(Xt)
+                x_hat = last_step.fit(Xt, yt, **last_step_params["fit"]).transform(
+                    Xt, **last_step_params["fit"]
+                )
             self._y_hat = (
                 yt if not hasattr(last_step, "_y_hat") else getattr(last_step, "_y_hat")
             )
             return x_hat
 
     @available_if(_final_estimator_has("predict"))
-    def predict(self, x: Sequence, y: Optional[Sequence] = None, **predict_params):
+    def predict(self, x: Sequence, y: Optional[Sequence] = None, **params):
         """Transform the data, and apply `predict` with the final estimator.
 
         Call `transform` of each transformer in the pipeline. The transformed
@@ -175,7 +187,7 @@ class TransformPipeline(Pipeline):
             Data to predict on. Must fulfill input requirements of first step
             of the pipeline.
 
-        **predict_params : dict of string -> object
+        **params : dict of string -> object
             Parameters to the ``predict`` called at the end of all
             transformations in the pipeline. Note that while this may be
             used to return uncertainties from some models with return_std
@@ -192,10 +204,37 @@ class TransformPipeline(Pipeline):
         """
         xt = x
         yt = y
+        if not _routing_enabled():
+            for _, name, transform in self._iter(with_final=False):
+                has_y_param: bool = (
+                    "y" in inspect.signature(transform.transform).parameters
+                )
+                if has_y_param and yt is not None:
+                    xt = transform.transform(xt, yt)
+                    yt = (
+                        yt
+                        if not hasattr(transform, "_y_hat")
+                        else getattr(transform, "_y_hat")
+                    )
+                    self._y_lengths = (
+                        self._y_lengths
+                        if not hasattr(transform, "_y_lengths")
+                        else getattr(transform, "_y_lengths")
+                    )
+                else:
+                    xt = transform.transform(xt)
+            self._y_hat = yt
+
+            if hasattr(self.steps[-1][1], "use_lengths"):
+                params.update({"lengths": self._y_lengths})
+            return self.steps[-1][1].predict(xt, **params)
+
+        # metadata routing enabled
+        routed_params = process_routing(self, "predict", **params)
         for _, name, transform in self._iter(with_final=False):
-            has_y_param: bool = "y" in inspect.signature(transform.transform).parameters
-            if has_y_param and yt is not None:
-                xt = transform.transform(xt, yt)
+            has_y_param = "y" in inspect.signature(transform.transform).parameters
+            if has_y_param is not None:
+                xt = transform.transform(xt, yt, **routed_params[name].transform)
                 yt = (
                     yt
                     if not hasattr(transform, "_y_hat")
@@ -207,17 +246,13 @@ class TransformPipeline(Pipeline):
                     else getattr(transform, "_y_lengths")
                 )
             else:
-                xt = transform.transform(xt)
-        self._y_hat = yt
-
+                xt = transform.transform(xt, **routed_params[name].transform)
         if hasattr(self.steps[-1][1], "use_lengths"):
-            predict_params.update({"lengths": self._y_lengths})
-        return self.steps[-1][1].predict(xt, **predict_params)
+            params.update({"lengths": self._y_lengths})
+        return self.steps[-1][1].predict(xt, **routed_params[self.steps[-1][0]].predict)
 
     @available_if(_final_estimator_has("predict_proba"))
-    def predict_proba(
-        self, x: Sequence, y: Optional[Sequence] = None, **predict_proba_params
-    ):
+    def predict_proba(self, x: Sequence, y: Optional[Sequence] = None, **params):
         """Transform the data, and apply `predict_proba` with the final estimator.
 
         Call `transform` of each transformer in the pipeline. The transformed
@@ -231,7 +266,7 @@ class TransformPipeline(Pipeline):
             Data to predict on. Must fulfill input requirements of first step
             of the pipeline.
 
-        **predict_proba_params : dict of string -> object
+        **params : dict of string -> object
             Parameters to the `predict_proba` called at the end of all
             transformations in the pipeline.
 
@@ -242,10 +277,38 @@ class TransformPipeline(Pipeline):
         """
         xt = x
         yt = y
+
+        if not _routing_enabled():
+            for _, name, transform in self._iter(with_final=False):
+                has_y_param: bool = (
+                    "y" in inspect.signature(transform.transform).parameters
+                )
+                if has_y_param:
+                    xt = transform.transform(xt, yt)
+                    yt = (
+                        yt
+                        if not hasattr(transform, "_y_hat")
+                        else getattr(transform, "_y_hat")
+                    )
+                    self._y_lengths = (
+                        self._y_lengths
+                        if not hasattr(transform, "_y_lengths")
+                        else getattr(transform, "_y_lengths")
+                    )
+                else:
+                    xt = transform.transform(xt)
+
+            self._y_hat = yt
+            if hasattr(self.steps[-1][1], "use_lengths"):
+                params.update({"lengths": self._y_lengths})
+            return self.steps[-1][1].predict_proba(xt, **params)
+
+        # metadata routing enabled
+        routed_params = process_routing(self, "predict_proba", **params)
         for _, name, transform in self._iter(with_final=False):
-            has_y_param: bool = "y" in inspect.signature(transform.transform).parameters
+            has_y_param = "y" in inspect.signature(transform.transform).parameters
             if has_y_param:
-                xt = transform.transform(xt, yt)
+                xt = transform.transform(xt, yt, **routed_params[name].transform)
                 yt = (
                     yt
                     if not hasattr(transform, "_y_hat")
@@ -257,15 +320,17 @@ class TransformPipeline(Pipeline):
                     else getattr(transform, "_y_lengths")
                 )
             else:
-                xt = transform.transform(xt)
+                xt = transform.transform(xt, **routed_params[name].transform)
 
         self._y_hat = yt
         if hasattr(self.steps[-1][1], "use_lengths"):
-            predict_proba_params.update({"lengths": self._y_lengths})
-        return self.steps[-1][1].predict_proba(xt, **predict_proba_params)
+            params.update({"lengths": self._y_lengths})
+        return self.steps[-1][1].predict_proba(
+            xt, **routed_params[self.steps[-1][0]].predict_proba
+        )
 
     @available_if(_final_estimator_has("score"))
-    def score(self, X: Sequence, y=None, sample_weight=None):
+    def score(self, X: Sequence, y=None, sample_weight=None, **params):
         """Transform the data, and apply `score` with the final estimator.
         Call `transform` of each transformer in the pipeline. The transformed
         data are finally passed to the final estimator that calls
@@ -288,11 +353,40 @@ class TransformPipeline(Pipeline):
         """
         Xt = X
         yt = y
+
+        if not _routing_enabled():
+            for _, name, transform in self._iter(with_final=False):
+                if yt is not None:
+                    Xt = transform.fit_transform(Xt, yt)
+                else:
+                    Xt = transform.transform(Xt)
+                yt = (
+                    yt
+                    if not hasattr(transform, "_y_hat")
+                    else getattr(transform, "_y_hat")
+                )
+                self._y_lengths = (
+                    self._y_lengths
+                    if not hasattr(transform, "_y_lengths")
+                    else getattr(transform, "_y_lengths")
+                )
+
+            score_params = {}
+            if sample_weight is not None:
+                score_params["sample_weight"] = sample_weight
+            if hasattr(self.steps[-1][1], "use_lengths"):
+                score_params.update({"lengths": self._y_lengths})
+            return self.steps[-1][1].score(Xt, yt, **score_params)
+
+        # metadata routing enabled
+        routed_params = process_routing(
+            self, "score", sample_weight=sample_weight, **params
+        )
         for _, name, transform in self._iter(with_final=False):
             if yt is not None:
-                Xt = transform.fit_transform(Xt, yt)
+                Xt = transform.fit_transform(Xt, yt, **routed_params[name].transform)
             else:
-                Xt = transform.transform(Xt)
+                Xt = transform.transform(Xt, **routed_params[name].transform)
             yt = (
                 yt if not hasattr(transform, "_y_hat") else getattr(transform, "_y_hat")
             )
@@ -302,15 +396,12 @@ class TransformPipeline(Pipeline):
                 else getattr(transform, "_y_lengths")
             )
 
-        score_params = {}
-        if sample_weight is not None:
-            score_params["sample_weight"] = sample_weight
         if hasattr(self.steps[-1][1], "use_lengths"):
-            score_params.update({"lengths": self._y_lengths})
-        return self.steps[-1][1].score(Xt, yt, **score_params)
+            params.update({"lengths": self._y_lengths})
+        return self.steps[-1][1].score(Xt, yt, **routed_params[self.steps[-1][0]].score)
 
     def transform(
-        self, x: Sequence, y: Sequence, debug: bool = False
+        self, x: Sequence, y: Sequence, debug: bool = False, **params
     ) -> Tuple[Sequence, Sequence]:
         """
         preform a transformation on both the data and the labels. Useful for
@@ -335,6 +426,8 @@ class TransformPipeline(Pipeline):
         Tuple[Sequence, Sequence]
             The transformed X and y values
         """
+        _raise_for_params(params, self, "transform")
+
         # Store the original data
         self.x_original: Sequence = x
         self.y_original: Sequence = y
@@ -343,8 +436,13 @@ class TransformPipeline(Pipeline):
 
         xt: Sequence = x
         yt: Sequence
+        routed_params = process_routing(self, "transform", **params)
         for idx, name, transform in self._iter():
             xt, yt = _transform_one(transform, x, y, debug=debug)
+            xt = transform.transform(x, **routed_params[name].transform)
+            yt = (
+                yt if not hasattr(transform, "_y_hat") else getattr(transform, "_y_hat")
+            )
             self._y_lengths = (
                 self._y_lengths
                 if not hasattr(transform, "_y_lengths")
@@ -420,25 +518,28 @@ def _transform_one(
 
 
 def _fit_transform_one(
-    transformer, X, y, weight, message_clsname="", message=None, **fit_params
+    transformer, X, y, weight, message_clsname="", message=None, params=None
 ):
     """
     Fits ``transformer`` to ``X`` and ``y``. The transformed result is returned
     with the fitted transformer. If ``weight`` is not ``None``, the result will
     be multiplied by ``weight``.
     """
+    params = params or {}
     X, y = reform_mask_xy(X, y)
     transformer = transformer_reform_mask(transformer)
     with _print_elapsed_time(message_clsname, message):
         if hasattr(transformer, "fit_transform"):
-            res_x = transformer.fit_transform(X, y, **fit_params)
+            res_x = transformer.fit_transform(X, y, **params.get("fit_transform", {}))
             res_y = (
                 y
                 if not hasattr(transformer, "_y_hat")
                 else getattr(transformer, "_y_hat")
             )
         else:
-            res_x = transformer.fit(X, y, **fit_params).transform(X)
+            res_x = transformer.fit(X, y, **params.get("fit", {})).transform(
+                X, **params.get("transform", {})
+            )
             res_y = (
                 y
                 if not hasattr(transformer, "_y_hat")

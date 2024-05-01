@@ -2,7 +2,7 @@ import mne  # type: ignore
 import numpy as np
 from mne.io import RawArray  # type: ignore
 from mne import create_info, set_log_level  # type: ignore
-from pipeline.mne.labeler import Labeler
+from preprocessingpipeline.mne.labeler import Labeler
 from typing import List
 
 

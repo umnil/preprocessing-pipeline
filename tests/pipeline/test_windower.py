@@ -1,5 +1,5 @@
 import numpy as np
-from pipeline.windower import Windower
+from preprocessingpipeline.windower import Windower
 from typing import List, Tuple, cast
 
 

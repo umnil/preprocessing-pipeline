@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd  # type: ignore
 
 from typing import Tuple
-from pipeline.inline.extractor import Extractor
+from preprocessingpipeline.inline.extractor import Extractor
 
 
 class TestExtractor:
