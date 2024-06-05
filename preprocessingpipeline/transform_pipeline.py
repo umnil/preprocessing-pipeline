@@ -2,18 +2,13 @@ import inspect
 import pickle
 import numpy as np
 
-from typing import Dict, IO, Sequence, List, Optional, Tuple, cast
 from datetime import datetime
+from importlib.metadata import version
+from typing import Dict, IO, Sequence, List, Optional, Tuple, cast
 
 from sklearn.base import TransformerMixin, clone  # type: ignore
 from sklearn.pipeline import Pipeline  # type: ignore
-from sklearn.utils import _print_elapsed_time  # type: ignore
 from sklearn.utils.metaestimators import available_if  # type: ignore
-from sklearn.utils.metadata_routing import (  # type: ignore
-    _raise_for_params,
-    _routing_enabled,
-    process_routing,
-)
 from sklearn.utils.validation import check_memory  # type: ignore
 from .utils import (
     split_mask_xy,
@@ -21,6 +16,22 @@ from .utils import (
     transformer_split_mask,
     transformer_reform_mask,
 )
+
+scikit_version = float(".".join(version("scikit-learn").split(".")[:2]))
+
+if scikit_version > 1.4:
+    from sklearn.utils.metadata_routing import (  # type: ignore
+        _raise_for_params,
+        _routing_enabled,
+        process_routing,
+    )
+else:
+    from sklearn.utils import _print_elapsed_time  # type: ignore
+
+if scikit_version > 1.4:
+    from sklearn.utils._user_interface import (  # type: ignore  # noqa F811
+        _print_elapsed_time,
+    )
 
 
 def _final_estimator_has(attr):
@@ -151,7 +162,13 @@ class TransformPipeline(Pipeline):
             Typically ndarray of shape (n_samples, n_transformed_features)
             Transformed samples.
         """
-        routed_params = self._check_method_params(method="fit_transform", props=params)
+        if scikit_version >= 1.4:
+            routed_params = self._check_method_params(
+                method="fit_transform", props=params
+            )
+        else:
+            routed_params = self._check_fit_params(**params)
+
         Xt, yt = self._fit(X, y, routed_params)
 
         last_step = self._final_estimator
@@ -163,7 +180,10 @@ class TransformPipeline(Pipeline):
                 if self.use_lengths:
                     last_step_params.update({"lengths": self._y_lengths})
             if hasattr(last_step, "fit_transform"):
-                x_hat = last_step.fit_transform(Xt, yt, **last_step_params["fit"])
+                if scikit_version >= 1.4:
+                    x_hat = last_step.fit_transform(Xt, yt, **last_step_params["fit"])
+                else:
+                    x_hat = last_step.fit_transform(Xt, yt, **last_step_params)
             else:
                 x_hat = last_step.fit(Xt, yt, **last_step_params["fit"]).transform(
                     Xt, **last_step_params["fit"]
