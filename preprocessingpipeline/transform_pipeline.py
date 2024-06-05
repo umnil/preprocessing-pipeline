@@ -446,7 +446,8 @@ class TransformPipeline(Pipeline):
         Tuple[Sequence, Sequence]
             The transformed X and y values
         """
-        _raise_for_params(params, self, "transform")
+        if scikit_version >= 1.4:
+            _raise_for_params(params, self, "transform")
 
         # Store the original data
         self.x_original: Sequence = x
@@ -456,10 +457,28 @@ class TransformPipeline(Pipeline):
 
         xt: Sequence = x
         yt: Sequence
-        routed_params = process_routing(self, "transform", **params)
+
+        if scikit_version >= 1.4:
+            routed_params = process_routing(self, "transform", **params)
+
         for idx, name, transform in self._iter():
-            xt, yt = _transform_one(transform, x, y, debug=debug)
-            xt = transform.transform(x, **routed_params[name].transform)
+            if scikit_version >= 1.4:
+                xt = transform.transform(x, **routed_params[name].transform)
+            else:
+                has_y_param: bool = (
+                    "y" in inspect.signature(transform.transform).parameters
+                )
+                if has_y_param:
+                    xt = transform.transform(x, y)
+                    yt = (
+                        y
+                        if not hasattr(transform, "_y_hat")
+                        else getattr(transform, "_y_hat")
+                    )
+                else:
+                    xt = transform.transform(x)
+                    yt = y
+
             yt = (
                 yt if not hasattr(transform, "_y_hat") else getattr(transform, "_y_hat")
             )
