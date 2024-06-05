@@ -117,8 +117,8 @@ def good_channels(x: List[mne.io.Raw]) -> List[mne.io.Raw]:
     ]
 
 
-def pwr(x: np.ndarray) -> np.ndarray:
-    """Compute the power scale of a spectral density
+def db(x: np.ndarray) -> np.ndarray:
+    """Compute the decibel scale of a spectral density
 
     Parameters
     ----------
@@ -130,4 +130,4 @@ def pwr(x: np.ndarray) -> np.ndarray:
     np.ndarray
         The same ax x transformed
     """
-    return -20 * np.log10(x + 1e-15)
+    return 10 * np.log10(x + 1e-15)

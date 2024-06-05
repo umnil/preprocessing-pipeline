@@ -3,9 +3,9 @@ import numpy as np
 import pandas as pd  # type: ignore
 
 from typing import List
-from pipeline.inline.extractor import Extractor
-from pipeline.inline.windower import Windower
-from pipeline.inline.filter import Filterer
+from preprocessingpipeline.inline.extractor import Extractor
+from preprocessingpipeline.inline.windower import Windower
+from preprocessingpipeline.inline.filter import Filterer
 
 
 class TestFilterer:

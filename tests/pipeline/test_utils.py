@@ -1,5 +1,5 @@
 import numpy as np
-from pipeline.utils import (
+from preprocessingpipeline.utils import (
     equalize_list_to_array,
     equalize_shape,
     generate_padding_param,
