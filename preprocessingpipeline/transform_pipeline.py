@@ -29,7 +29,9 @@ else:
     from sklearn.utils import _print_elapsed_time  # type: ignore
 
 if scikit_version > 1.4:
-    from sklearn.utils._user_interface import _print_elapsed_time  # type: ignore
+    from sklearn.utils._user_interface import (  # type: ignore  # noqa F811
+        _print_elapsed_time,
+    )
 
 
 def _final_estimator_has(attr):
