@@ -63,12 +63,15 @@ def concat(x: np.ndarray, y: np.ndarray, **kwargs) -> Tuple[np.ndarray, np.ndarr
     keep_mask: bool = kwargs.get("keep_mask", False)
     x = np.moveaxis(x, 1, 2)
     if active:
-        if keep_mask:
-            x = x.reshape(-1, *x.shape[2:])
-            y = y.flatten()
-        else:
-            x = np.concatenate(unmask_array(x)).astype(np.float64)
-            y = np.hstack(unmask_array(y))
+        x = x.reshape(-1, *x.shape[2:])
+        y = y.flatten()
+        if not keep_mask:
+            y = np.ma.masked_invalid(y)
+            x = np.ma.masked_invalid(x)
+
+            y = np.array([yi for xi, yi in zip(x, y) if not xi.mask.any()])
+            x = np.stack([w.data for w in x if not w.mask.any()])
+
     return x.astype(np.float64), y.astype(np.float64)
 
 
