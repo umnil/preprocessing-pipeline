@@ -3,16 +3,8 @@
 This library provides pre-built methods for processing ragged dataset which is
 particularly useful for time series data of channels with different sampling
 rates
+
 ## Getting Started
-
-### Prerequisites
-
-- Anaconda or Miniconda
-- Git version control software
-- Required Python packages (list in `requirements.txt`)
-- Access to the shared box folder with the data
-- Access to the Zotero reference library with Better BibTex installed and
-  automated reference bib export
 
 ### Installation
 
