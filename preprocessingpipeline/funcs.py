@@ -4,7 +4,7 @@ from functools import reduce
 from mne import set_eeg_reference  # type: ignore
 from typing import List, Optional, Tuple
 from .masked import TemporalFilter
-from .utils import get_frequency_bins, unmask_array
+from .utils import get_frequency_bins
 
 
 def channel_select(
