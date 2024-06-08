@@ -462,26 +462,23 @@ class TransformPipeline(Pipeline):
             routed_params = process_routing(self, "transform", **params)
 
         for idx, name, transform in self._iter():
-            if scikit_version >= 1.4:
-                xt = transform.transform(x, **routed_params[name].transform)
-            else:
-                has_y_param: bool = (
-                    "y" in inspect.signature(transform.transform).parameters
-                )
-                if has_y_param:
+            has_y_param: bool = "y" in inspect.signature(transform.transform).parameters
+            if has_y_param:
+                if scikit_version >= 1.4:
+                    xt = transform.transform(x, y, **routed_params[name].transform)
+                else:
                     xt = transform.transform(x, y)
-                    yt = (
-                        y
-                        if not hasattr(transform, "_y_hat")
-                        else getattr(transform, "_y_hat")
-                    )
+                yt = (
+                    y
+                    if not hasattr(transform, "_y_hat")
+                    else getattr(transform, "_y_hat")
+                )
+            else:
+                if scikit_version >= 1.4:
+                    xt = transform.transform(x, **routed_params[name].transform)
                 else:
                     xt = transform.transform(x)
-                    yt = y
-
-            yt = (
-                yt if not hasattr(transform, "_y_hat") else getattr(transform, "_y_hat")
-            )
+                yt = y
             self._y_lengths = (
                 self._y_lengths
                 if not hasattr(transform, "_y_lengths")
