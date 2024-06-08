@@ -6,7 +6,7 @@ from sklearn.utils.metadata_routing import (  # type: ignore
     _routing_enabled,
     process_routing,
 )
-from .transform_pipeline import _transform_one, _fit_transform_one
+from .transform_pipeline import _transform_one, _fit_transform_one, scikit_version
 
 try:
     from sklearn.utils.parallel import Parallel, delayed  # type: ignore
@@ -36,20 +36,23 @@ class TransformFeatureUnion(FeatureUnion):
             The `hstack` of results of transformers. `sum_n_components` is the
             sum of `n_components` (output dimension) over transformers.
         """
-        if _routing_enabled():
-            routed_params = process_routing(self, "fit_transform", **params)
-        else:
-            routed_params = Bunch()
-            for name, obj in self.transformer_list:
-                if hasattr(obj, "fit_transformer"):
-                    routed_params[name] = Bunch(fit_transform={})
-                    routed_params[name].fit_transform = params
-                else:
-                    routed_params[name] = Bunch(fit={})
-                    routed_params[name] = Bunch(transform={})
-                    routed_params[name].fit = params
+        if scikit_version > 1.4:
+            if _routing_enabled():
+                routed_params = process_routing(self, "fit_transform", **params)
+            else:
+                routed_params = Bunch()
+                for name, obj in self.transformer_list:
+                    if hasattr(obj, "fit_transformer"):
+                        routed_params[name] = Bunch(fit_transform={})
+                        routed_params[name].fit_transform = params
+                    else:
+                        routed_params[name] = Bunch(fit={})
+                        routed_params[name] = Bunch(transform={})
+                        routed_params[name].fit = params
 
-        results = self._parallel_func(x, y, _fit_transform_one, routed_params)
+            results = self._parallel_func(x, y, _fit_transform_one, routed_params)
+        else:
+            results = self._parallel_func(x, y, params, _fit_transform_one)
         if not results:
             # All transformers are None
             self._y_hat = y
