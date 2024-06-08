@@ -19,19 +19,19 @@ from .utils import (
 
 scikit_version = float(".".join(version("scikit-learn").split(".")[:2]))
 
-if scikit_version > 1.4:
+if scikit_version >= 1.4:
     from sklearn.utils.metadata_routing import (  # type: ignore
         _raise_for_params,
         _routing_enabled,
         process_routing,
     )
-else:
-    from sklearn.utils import _print_elapsed_time  # type: ignore
 
 if scikit_version > 1.4:
     from sklearn.utils._user_interface import (  # type: ignore  # noqa F811
         _print_elapsed_time,
     )
+else:
+    from sklearn.utils import _print_elapsed_time  # type: ignore
 
 
 def _final_estimator_has(attr):
