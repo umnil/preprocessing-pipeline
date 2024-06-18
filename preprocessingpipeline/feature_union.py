@@ -2,16 +2,18 @@ import numpy as np
 
 from sklearn.pipeline import FeatureUnion  # type: ignore
 from sklearn.utils import Bunch  # type: ignore
-from sklearn.utils.metadata_routing import (  # type: ignore
-    _routing_enabled,
-    process_routing,
-)
 from .transform_pipeline import _transform_one, _fit_transform_one, scikit_version
 
 try:
     from sklearn.utils.parallel import Parallel, delayed  # type: ignore
 except ModuleNotFoundError:
     from joblib import Parallel, delayed  # type: ignore
+
+if scikit_version > 1.4:
+    from sklearn.utils.metadata_routing import (  # type: ignore
+        _routing_enabled,
+        process_routing,
+    )
 
 
 class TransformFeatureUnion(FeatureUnion):
