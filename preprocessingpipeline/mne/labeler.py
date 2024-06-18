@@ -162,7 +162,7 @@ class Labeler(TransformerMixin, BaseEstimator):
         data_list: List[np.ndarray] = []
         for i in x:
             i = i.copy() if self.channels is None else i.copy().pick(self.channels)
-            data = i.get_data(units="uV")
+            data = i.get_data(units={"eeg": "uV", "misc": "AU"})
             data_list.append(data)
 
         filtered_data: List = [i[..., m] for i, m in zip(data_list, self._mask)]
