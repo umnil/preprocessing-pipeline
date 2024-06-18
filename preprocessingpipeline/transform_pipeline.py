@@ -298,7 +298,8 @@ class TransformPipeline(Pipeline):
         xt = x
         yt = y
 
-        if not _routing_enabled():
+        routing_enabled: bool = False if scikit_version < 1.4 else _routing_enabled()
+        if not routing_enabled:
             for _, name, transform in self._iter(with_final=False):
                 has_y_param: bool = (
                     "y" in inspect.signature(transform.transform).parameters
