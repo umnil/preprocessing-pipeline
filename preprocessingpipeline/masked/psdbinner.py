@@ -32,7 +32,7 @@ class MaskedPSDBinner(PSDBinner):
         ]
         np_x = np.array(
             [
-                [self._fn(xi[f], i) for f in fi]
+                [self._fn(xi[f], i, f=self.freqs[f]) for f in fi]
                 for i, (xi, fi) in enumerate(zip(x, freq_idxs))
             ]
         )
