@@ -33,7 +33,7 @@ class PSDBinner(TransformerMixin, BaseEstimator):
         ]
         x = np.array(
             [
-                [self._fn(xi[f], i) for f in fi]
+                [self._fn(xi[f], i, f=self.freqs[f]) for f in fi]
                 for i, (xi, fi) in enumerate(zip(x, freq_idxs))
             ]
         )
@@ -42,9 +42,9 @@ class PSDBinner(TransformerMixin, BaseEstimator):
             x = x[..., self.select_bins]
         return x
 
-    def _fn(self, x: np.ndarray, i: int) -> np.ndarray:
+    def _fn(self, x: np.ndarray, i: int, *args, **kwargs) -> np.ndarray:
         if isinstance(self.fn, str):
             return np.__dict__[self.fn](x)
         else:
             f: Callable = cast(Callable, self.fn)
-            return f(x, i)
+            return f(x, i, *args, **kwargs)
